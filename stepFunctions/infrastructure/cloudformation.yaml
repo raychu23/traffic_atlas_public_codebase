@@ -1,0 +1,552 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for Dataset Sample Processing Pipeline'
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: dev
+    Description: Environment name for resource naming
+  
+  ECRRepositoryName:
+    Type: String
+    Default: dataset-processing
+    Description: ECR repository name for Docker images
+
+Resources:
+  # ============================================================================
+  # DynamoDB Table for Dataset Metadata
+  # ============================================================================
+  DatasetUploadsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'dataset-uploads-${EnvironmentName}'
+      AttributeDefinitions:
+        - AttributeName: dataset_id
+          AttributeType: S
+        - AttributeName: user_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: dataset_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UserDatasetIndex
+          KeySchema:
+            - AttributeName: user_id
+              KeyType: HASH
+            - AttributeName: dataset_id
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          BillingMode: PAY_PER_REQUEST
+      BillingMode: PAY_PER_REQUEST
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # ============================================================================
+  # IAM Role for Lambda Functions
+  # ============================================================================
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'dataset-lambda-role-${EnvironmentName}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                  - s3:ListBucketV2
+                Resource:
+                  - !Sub 'arn:aws:s3:::${DatasetBucket}'
+                  - !Sub 'arn:aws:s3:::${DatasetBucket}/*'
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                Resource:
+                  - !GetAtt DatasetUploadsTable.Arn
+                  - !Sub '${DatasetUploadsTable.Arn}/index/*'
+
+  # ============================================================================
+  # IAM Role for Step Functions
+  # ============================================================================
+  StepFunctionsExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'dataset-stepfunctions-role-${EnvironmentName}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaInvoke
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:dataset-*'
+        - PolicyName: BatchSubmit
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - batch:SubmitJob
+                  - batch:DescribeJobs
+                  - batch:ListJobs
+                Resource: '*'
+        - PolicyName: BedrockInvoke
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelBatch
+                  - bedrock:GetInvocationJob
+                Resource: '*'
+
+  # ============================================================================
+  # IAM Role for AWS Batch
+  # ============================================================================
+  BatchExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'dataset-batch-role-${EnvironmentName}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - ecs-tasks.amazonaws.com
+                - ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                  - s3:ListBucketV2
+                Resource:
+                  - !Sub 'arn:aws:s3:::${DatasetBucket}'
+                  - !Sub 'arn:aws:s3:::${DatasetBucket}/*'
+        - PolicyName: ECRAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                Resource: '*'
+
+  BatchInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref BatchExecutionRole
+
+  # ============================================================================
+  # S3 Bucket for Dataset Storage
+  # ============================================================================
+  DatasetBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'dataset-processing-${AWS::AccountId}-${EnvironmentName}'
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldTemporaryFiles
+            Status: Enabled
+            Prefix: temporary/
+            ExpirationInDays: 7
+          - Id: TransitionArchivedData
+            Status: Enabled
+            Prefix: sample_data/
+            Transitions:
+              - TransitionInDays: 90
+                StorageClass: GLACIER
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  DatasetBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref DatasetBucket
+      PolicyText:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS:
+                - !GetAtt LambdaExecutionRole.Arn
+                - !GetAtt BatchExecutionRole.Arn
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:ListBucket
+              - s3:ListBucketV2
+            Resource:
+              - !Sub '${DatasetBucket.Arn}'
+              - !Sub '${DatasetBucket.Arn}/*'
+
+  # ============================================================================
+  # Lambda Functions
+  # ============================================================================
+  RegisterUploadFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: dataset-register-upload
+      Runtime: nodejs18.x
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 60
+      MemorySize: 256
+      Code:
+        ZipFile: |
+          // Content from register-upload.js would be embedded here
+          const handler = require('./register-upload.js').handler;
+          exports.handler = handler;
+      Environment:
+        Variables:
+          DATASET_TABLE: !Ref DatasetUploadsTable
+
+  BuildTaggingInputFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: dataset-build-tagging-input
+      Runtime: nodejs18.x
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 300
+      MemorySize: 1024
+      EphemeralStorage:
+        Size: 2048
+      Code:
+        ZipFile: |
+          // Content from build-tagging-input.js
+          const handler = require('./build-tagging-input.js').handler;
+          exports.handler = handler;
+
+  ParseTagOutputsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: dataset-parse-tag-outputs
+      Runtime: nodejs18.x
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 300
+      MemorySize: 1024
+      EphemeralStorage:
+        Size: 2048
+      Code:
+        ZipFile: |
+          // Content from parse-tag-outputs.js
+          const handler = require('./parse-tag-outputs.js').handler;
+          exports.handler = handler;
+
+  BuildSummariesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: dataset-build-summaries
+      Runtime: nodejs18.x
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 300
+      MemorySize: 1024
+      EphemeralStorage:
+        Size: 2048
+      Code:
+        ZipFile: |
+          // Content from build-summaries.js
+          const handler = require('./build-summaries.js').handler;
+          exports.handler = handler;
+
+  UpdateStatusFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: dataset-update-status
+      Runtime: nodejs18.x
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 60
+      MemorySize: 256
+      Code:
+        ZipFile: |
+          // Content from update-status.js
+          const handler = require('./update-status.js').handler;
+          exports.handler = handler;
+      Environment:
+        Variables:
+          DATASET_TABLE: !Ref DatasetUploadsTable
+
+  # ============================================================================
+  # AWS Batch Configuration
+  # ============================================================================
+  ComputeEnvironment:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties:
+      ComputeEnvironmentName: !Sub 'dataset-compute-${EnvironmentName}'
+      Type: MANAGED
+      State: ENABLED
+      ComputeResources:
+        Type: EC2
+        MinvCpus: 0
+        MaxvCpus: 256
+        DesiredvCpus: 0
+        InstanceTypes:
+          - m5.large
+          - m5.xlarge
+          - m5.2xlarge
+          - g4dn.xlarge
+          - g4dn.2xlarge
+        Subnets:
+          - !ImportValue VPCPrivateSubnet1
+          - !ImportValue VPCPrivateSubnet2
+        SecurityGroupIds:
+          - !ImportValue VPCSecurityGroup
+        InstanceRole: !GetAtt BatchInstanceProfile.Arn
+
+  VideoProcessingQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      JobQueueName: video-processing-queue
+      State: ENABLED
+      Priority: 1
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref ComputeEnvironment
+
+  MLProcessingQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      JobQueueName: ml-processing-queue
+      State: ENABLED
+      Priority: 1
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref ComputeEnvironment
+
+  # ============================================================================
+  # Step Functions State Machine
+  # ============================================================================
+  DatasetProcessingStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineType: STANDARD
+      RoleArn: !GetAtt StepFunctionsExecutionRole.Arn
+      DefinitionString: !Sub |
+        {
+          "Comment": "DatasetSampleProcessing - Orchestrates video extraction, tagging, embedding, and aggregation",
+          "StartAt": "RegisterUpload",
+          "States": {
+            "RegisterUpload": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "${RegisterUploadFunction.Arn}",
+                "Payload": {
+                  "dataset_id.$": "$.dataset_id",
+                  "user_id.$": "$.user_id",
+                  "bucket.$": "$.bucket",
+                  "zip_key.$": "$.zip_key"
+                }
+              },
+              "ResultPath": "$.registerResult",
+              "Next": "ExtractFrames"
+            },
+            "ExtractFrames": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::batch:submitJob.sync",
+              "Parameters": {
+                "JobName.$": "$.dataset_id",
+                "JobQueue": "video-processing-queue",
+                "JobDefinition": "dataset-frame-extraction",
+                "ContainerOverrides": {
+                  "Environment": [
+                    {
+                      "Name": "DATASET_ID",
+                      "Value.$": "$.dataset_id"
+                    },
+                    {
+                      "Name": "BUCKET",
+                      "Value.$": "$.bucket"
+                    },
+                    {
+                      "Name": "ZIP_KEY",
+                      "Value.$": "$.zip_key"
+                    },
+                    {
+                      "Name": "OUTPUT_PREFIX",
+                      "Value.$": "States.Format('sample_data/{}/sample_analysis/frames', $.dataset_id)"
+                    }
+                  ]
+                }
+              },
+              "ResultPath": "$.batchExtractResult",
+              "Retry": [
+                {
+                  "ErrorEquals": ["States.TaskFailed"],
+                  "IntervalSeconds": 2,
+                  "MaxAttempts": 3,
+                  "BackoffRate": 2.0
+                }
+              ],
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "Next": "HandleExtractionFailure"
+                }
+              ],
+              "Next": "BuildTaggingInput"
+            },
+            "HandleExtractionFailure": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "${UpdateStatusFunction.Arn}",
+                "Payload": {
+                  "dataset_id.$": "$.dataset_id",
+                  "status": "extraction_failed"
+                }
+              },
+              "End": true
+            },
+            "BuildTaggingInput": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "${BuildTaggingInputFunction.Arn}",
+                "Payload": {
+                  "dataset_id.$": "$.dataset_id",
+                  "bucket.$": "$.bucket",
+                  "frames_prefix.$": "States.Format('sample_data/{}/sample_analysis/frames', $.dataset_id)"
+                }
+              },
+              "ResultPath": "$.taggingInputResult",
+              "Next": "GenerateEmbeddings"
+            },
+            "GenerateEmbeddings": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::batch:submitJob.sync",
+              "Parameters": {
+                "JobName.$": "States.Format('{}-embeddings', $.dataset_id)",
+                "JobQueue": "ml-processing-queue",
+                "JobDefinition": "dataset-embedding-generation",
+                "ContainerOverrides": {
+                  "Environment": [
+                    {
+                      "Name": "DATASET_ID",
+                      "Value.$": "$.dataset_id"
+                    },
+                    {
+                      "Name": "BUCKET",
+                      "Value.$": "$.bucket"
+                    },
+                    {
+                      "Name": "FRAMES_PREFIX",
+                      "Value.$": "States.Format('sample_data/{}/sample_analysis/frames', $.dataset_id)"
+                    },
+                    {
+                      "Name": "OUTPUT_PREFIX",
+                      "Value.$": "States.Format('sample_data/{}/sample_analysis/embeddings', $.dataset_id)"
+                    }
+                  ]
+                }
+              },
+              "ResultPath": "$.embeddingResult",
+              "Next": "BuildSummaries"
+            },
+            "BuildSummaries": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "${BuildSummariesFunction.Arn}",
+                "Payload": {
+                  "dataset_id.$": "$.dataset_id",
+                  "bucket.$": "$.bucket",
+                  "metadata_prefix.$": "States.Format('sample_data/{}/sample_analysis/metadata', $.dataset_id)"
+                }
+              },
+              "ResultPath": "$.summaryResult",
+              "Next": "UpdateDatasetStatus"
+            },
+            "UpdateDatasetStatus": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "${UpdateStatusFunction.Arn}",
+                "Payload": {
+                  "dataset_id.$": "$.dataset_id",
+                  "status": "completed",
+                  "summary_path.$": "States.Format('sample_data/{}/sample_analysis/metadata/dataset/', $.dataset_id)"
+                }
+              },
+              "ResultPath": "$.finalStatus",
+              "End": true
+            }
+          }
+        }
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+Outputs:
+  DatasetTableName:
+    Description: DynamoDB table for dataset metadata
+    Value: !Ref DatasetUploadsTable
+    Export:
+      Name: !Sub '${EnvironmentName}-DatasetTable'
+
+  DatasetBucketName:
+    Description: S3 bucket for dataset storage
+    Value: !Ref DatasetBucket
+    Export:
+      Name: !Sub '${EnvironmentName}-DatasetBucket'
+
+  StateMachineArn:
+    Description: Step Functions State Machine ARN
+    Value: !Ref DatasetProcessingStateMachine
+    Export:
+      Name: !Sub '${EnvironmentName}-StateMachineArn'
+
+  LambdaExecutionRoleArn:
+    Description: IAM Role for Lambda functions
+    Value: !GetAtt LambdaExecutionRole.Arn
+
+  BatchExecutionRoleArn:
+    Description: IAM Role for Batch jobs
+    Value: !GetAtt BatchExecutionRole.Arn

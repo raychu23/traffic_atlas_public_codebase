@@ -1,0 +1,7 @@
+# Amplify Hosting custom headers (also mirrored in amplify.yml).
+# Plotly spherical PCA requires unsafe-eval for WebGL / scatter3d.
+customHeaders:
+  - pattern: '**/*'
+    headers:
+      - key: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://api.example.com https://*.example.com https://your-s3-bucket.s3.us-east-1.amazonaws.com https://*.s3.us-east-1.amazonaws.com https://*.s3.amazonaws.com; worker-src 'self' blob:; child-src 'self' blob:; frame-ancestors 'self';"

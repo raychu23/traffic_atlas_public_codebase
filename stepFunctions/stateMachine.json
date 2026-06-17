@@ -1,0 +1,286 @@
+{
+  "Comment": "DatasetSampleProcessing - Orchestrates video extraction, tagging, embedding, and aggregation",
+  "StartAt": "RegisterUpload",
+  "States": {
+    "RegisterUpload": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "dataset-register-upload",
+        "Payload": {
+          "dataset_id.$": "$.dataset_id",
+          "user_id.$": "$.user_id",
+          "bucket.$": "$.bucket",
+          "zip_key.$": "$.zip_key"
+        }
+      },
+      "ResultPath": "$.registerResult",
+      "Next": "ExtractFrames"
+    },
+    "ExtractFrames": {
+      "Type": "Task",
+      "Resource": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:submitJob",
+      "Parameters": {
+        "JobName.$": "$.dataset_id",
+        "JobQueue": "video-processing-queue",
+        "JobDefinition": "dataset-frame-extraction",
+        "ContainerOverrides": {
+          "Environment": [
+            {
+              "Name": "DATASET_ID",
+              "Value.$": "$.dataset_id"
+            },
+            {
+              "Name": "BUCKET",
+              "Value.$": "$.bucket"
+            },
+            {
+              "Name": "ZIP_KEY",
+              "Value.$": "$.zip_key"
+            },
+            {
+              "Name": "OUTPUT_PREFIX",
+              "Value.$": "States.Format('sample_data/{}/sample_analysis/frames', $.dataset_id)"
+            }
+          ]
+        }
+      },
+      "ResultPath": "$.batchExtractResult",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "HandleExtractionFailure"
+        }
+      ],
+      "Next": "WaitForExtraction"
+    },
+    "WaitForExtraction": {
+      "Type": "Wait",
+      "Seconds": 30,
+      "Next": "CheckExtractionStatus"
+    },
+    "CheckExtractionStatus": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::batch:describeJobs",
+      "Parameters": {
+        "Jobs.$": "$.batchExtractResult.Jobs[*].JobId"
+      },
+      "ResultPath": "$.jobStatus",
+      "Next": "IsExtractionComplete"
+    },
+    "IsExtractionComplete": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.jobStatus.Jobs[0].Status",
+          "StringEquals": "SUCCEEDED",
+          "Next": "BuildTaggingInput"
+        },
+        {
+          "Variable": "$.jobStatus.Jobs[0].Status",
+          "StringEquals": "FAILED",
+          "Next": "HandleExtractionFailure"
+        }
+      ],
+      "Default": "WaitForExtraction"
+    },
+    "HandleExtractionFailure": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "dataset-update-status",
+        "Payload": {
+          "dataset_id.$": "$.dataset_id",
+          "status": "extraction_failed",
+          "error_message.$": "$.error_message"
+        }
+      },
+      "End": true
+    },
+    "BuildTaggingInput": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "dataset-build-tagging-input",
+        "Payload": {
+          "dataset_id.$": "$.dataset_id",
+          "bucket.$": "$.bucket",
+          "frames_prefix.$": "States.Format('sample_data/{}/sample_analysis/frames', $.dataset_id)"
+        }
+      },
+      "ResultPath": "$.taggingInputResult",
+      "Next": "RunBedrockBatchInference"
+    },
+    "RunBedrockBatchInference": {
+      "Type": "Task",
+      "Resource": "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:model-invocation-job",
+      "Parameters": {
+        "modelIdentifier": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+        "roleArn.$": "$.bedrockRoleArn",
+        "inputDataConfig": {
+          "s3InputFormat": "JSONL",
+          "s3Uri.$": "States.Format('s3://{}/sample_data/{}/sample_analysis/tagging_input.jsonl', $.bucket, $.dataset_id)"
+        },
+        "outputDataConfig": {
+          "s3OutputFormat": "JSONL",
+          "s3Uri.$": "States.Format('s3://{}/sample_data/{}/sample_analysis/bedrock_output/', $.bucket, $.dataset_id)"
+        }
+      },
+      "ResultPath": "$.bedrockResult",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 2,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "HandleTaggingFailure"
+        }
+      ],
+      "Next": "ParseTagOutputs"
+    },
+    "HandleTaggingFailure": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "dataset-update-status",
+        "Payload": {
+          "dataset_id.$": "$.dataset_id",
+          "status": "tagging_failed",
+          "error_message.$": "$.error_message"
+        }
+      },
+      "End": true
+    },
+    "ParseTagOutputs": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "dataset-parse-tag-outputs",
+        "Payload": {
+          "dataset_id.$": "$.dataset_id",
+          "bucket.$": "$.bucket",
+          "bedrock_output_prefix.$": "States.Format('sample_data/{}/sample_analysis/bedrock_output/', $.dataset_id)"
+        }
+      },
+      "ResultPath": "$.parseResult",
+      "Next": "GenerateEmbeddings"
+    },
+    "GenerateEmbeddings": {
+      "Type": "Task",
+      "Resource": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:submitJob",
+      "Parameters": {
+        "JobName.$": "States.Format('{}-embeddings', $.dataset_id)",
+        "JobQueue": "ml-processing-queue",
+        "JobDefinition": "dataset-embedding-generation",
+        "ContainerOverrides": {
+          "Environment": [
+            {
+              "Name": "DATASET_ID",
+              "Value.$": "$.dataset_id"
+            },
+            {
+              "Name": "BUCKET",
+              "Value.$": "$.bucket"
+            },
+            {
+              "Name": "FRAMES_PREFIX",
+              "Value.$": "States.Format('sample_data/{}/sample_analysis/frames', $.dataset_id)"
+            },
+            {
+              "Name": "OUTPUT_PREFIX",
+              "Value.$": "States.Format('sample_data/{}/sample_analysis/embeddings', $.dataset_id)"
+            }
+          ]
+        }
+      },
+      "ResultPath": "$.batchEmbedResult",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 2,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Next": "WaitForEmbeddings"
+    },
+    "WaitForEmbeddings": {
+      "Type": "Wait",
+      "Seconds": 30,
+      "Next": "CheckEmbeddingsStatus"
+    },
+    "CheckEmbeddingsStatus": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::batch:describeJobs",
+      "Parameters": {
+        "Jobs.$": "$.batchEmbedResult.Jobs[*].JobId"
+      },
+      "ResultPath": "$.embeddingsJobStatus",
+      "Next": "IsEmbeddingsComplete"
+    },
+    "IsEmbeddingsComplete": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.embeddingsJobStatus.Jobs[0].Status",
+          "StringEquals": "SUCCEEDED",
+          "Next": "BuildSummaries"
+        },
+        {
+          "Variable": "$.embeddingsJobStatus.Jobs[0].Status",
+          "StringEquals": "FAILED",
+          "Next": "HandleEmbeddingFailure"
+        }
+      ],
+      "Default": "WaitForEmbeddings"
+    },
+    "HandleEmbeddingFailure": {
+      "Type": "Pass",
+      "Result": "Embeddings generated but with warnings",
+      "ResultPath": "$.embeddingWarning",
+      "Next": "BuildSummaries"
+    },
+    "BuildSummaries": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "dataset-build-summaries",
+        "Payload": {
+          "dataset_id.$": "$.dataset_id",
+          "bucket.$": "$.bucket",
+          "metadata_prefix.$": "States.Format('sample_data/{}/sample_analysis/metadata', $.dataset_id)",
+          "frames_prefix.$": "States.Format('sample_data/{}/sample_analysis/frames', $.dataset_id)"
+        }
+      },
+      "ResultPath": "$.summaryResult",
+      "Next": "UpdateDatasetStatus"
+    },
+    "UpdateDatasetStatus": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "dataset-update-status",
+        "Payload": {
+          "dataset_id.$": "$.dataset_id",
+          "status": "completed",
+          "summary_path.$": "States.Format('sample_data/{}/sample_analysis/metadata/dataset/', $.dataset_id)"
+        }
+      },
+      "ResultPath": "$.finalStatus",
+      "End": true
+    }
+  }
+}

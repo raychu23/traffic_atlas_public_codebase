@@ -1,0 +1,5 @@
+transformers>=4.45.0
+boto3>=1.28.0
+Pillow>=10.0.0
+numpy>=1.24.0
+safetensors>=0.4.5

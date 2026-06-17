@@ -1,0 +1,30 @@
+{
+  "dataset_id": "4ee8dc70-c221-486f-9ec0-53cde7c8c41d",
+  "generated_at": "2026-05-15T16:28:02.010664+00:00",
+  "filter_tags": [
+    "lighting.daytime",
+    "weather.clear",
+    "road_type.highway",
+    "traffic_density.low",
+    "vehicle_presence.present",
+    "pedestrian_presence.absent",
+    "cyclist_presence.absent",
+    "truck_presence.absent",
+    "bus_presence.absent",
+    "motorcycle_presence.absent",
+    "emergency_vehicle_presence.absent"
+  ],
+  "dominant_tags": {
+    "lighting": "daytime",
+    "weather": "clear",
+    "road_type": "highway",
+    "traffic_density": "low",
+    "vehicle_presence": "present",
+    "pedestrian_presence": "absent",
+    "cyclist_presence": "absent",
+    "truck_presence": "absent",
+    "bus_presence": "absent",
+    "motorcycle_presence": "absent",
+    "emergency_vehicle_presence": "absent"
+  }
+}

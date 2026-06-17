@@ -1,0 +1,31 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - cd frontend
+        - npm install
+    build:
+      commands:
+        - export CI=false GENERATE_SOURCEMAP=false REACT_APP_USE_PIPELINE_DEMO=false
+        - npm run build
+  artifacts:
+    baseDirectory: frontend/build
+    files:
+      - '**/*'
+  # Plotly 3D (react-plotly.js) needs script-src 'unsafe-eval' for WebGL shaders.
+  customHeaders:
+    - pattern: '**/*'
+      headers:
+        - key: Content-Security-Policy
+          value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://api.example.com https://*.example.com https://your-s3-bucket.s3.us-east-1.amazonaws.com https://*.s3.us-east-1.amazonaws.com https://*.s3.amazonaws.com; worker-src 'self' blob:; child-src 'self' blob:; frame-ancestors 'self';"
+  customRedirects:
+    - source: '/static/<*>'
+      target: '/static/<*>'
+      status: '200'
+    - source: '/<*>'
+      target: '/index.html'
+      status: '404-200'
+  cache:
+    paths:
+      - frontend/node_modules/**/*

@@ -1,0 +1,114 @@
+.detail-dataset-tags {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-base);
+}
+
+.detail-dataset-tags-heading {
+  margin: 0 0 10px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-primary);
+}
+
+.detail-dataset-tags-status {
+  margin: 0 0 12px;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.detail-dataset-tags-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px 16px;
+  margin: 0;
+}
+
+.detail-dataset-tag-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.detail-dataset-tag-row dt {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.detail-dataset-tag-row dd {
+  margin: 0;
+}
+
+.detail-dataset-tag-value {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: var(--color-success-bg);
+  border: 1px solid var(--color-success-border);
+  color: var(--color-success-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  text-transform: capitalize;
+}
+
+.detail-dataset-tags-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.detail-dataset-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-strong);
+  font-size: var(--font-size-sm);
+}
+
+.detail-dataset-tag-chip-field {
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-semibold);
+}
+
+.detail-dataset-tag-chip-value {
+  color: var(--color-text);
+  font-weight: var(--font-weight-bold);
+  text-transform: capitalize;
+}
+
+.detail-dataset-tags-footnote {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.72rem;
+  line-height: var(--line-height-relaxed);
+  color: var(--color-text-muted);
+}
+
+.detail-dataset-tags-footnote-star {
+  margin-right: 0.25em;
+  color: var(--color-primary);
+  font-weight: var(--font-weight-bold);
+}
+
+@media (max-width: 480px) {
+  .detail-dataset-tags-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,43 @@
+/* Reuse styles from UploadConsent.css */
+.consent-summary {
+  background: #2a2a3e;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+  border: 1px solid #3a3a4e;
+}
+
+.consent-summary h2 {
+  margin-bottom: 1rem;
+  color: #e0e0e0;
+}
+
+.consent-summary p {
+  margin-bottom: 0.5rem;
+  color: #a0a0a0;
+}
+
+.consent-section {
+  margin-bottom: 2rem;
+}
+
+.consent-section .checkbox-group {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: #2a2a3e;
+  border-radius: 6px;
+  border: 1px solid #3a3a4e;
+}
+
+.consent-section .checkbox-group label {
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #c0c0c0;
+}
+
+.button-group {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+

@@ -1,0 +1,560 @@
+/* =================== Upload Progress Bar =================== */
+.upload-progress-container {
+    width: 100%;
+    margin-bottom: 16px;
+    padding: 16px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.upload-progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: #374151;
+}
+
+.upload-progress-percent {
+    color: #2a7c6f;
+    font-weight: 600;
+}
+
+.upload-progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+
+.upload-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #2a7c6f 0%, #5eead4 100%);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    position: relative;
+}
+
+.upload-progress-fill::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.3) 50%,
+        transparent 100%
+    );
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+.upload-atlas .upload-card {
+    background: #fff;
+    color: #0a0a0a;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    min-height: calc(100vh - 56px);
+    padding: 110px 0 120px;
+}
+
+.upload-atlas .form-group label,
+.upload-atlas .plain-text,
+.upload-atlas h2 {
+    color: #404040;
+}
+
+.upload-atlas h2 {
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-tight);
+    font-weight: var(--font-weight-semibold);
+    margin-bottom: 24px;
+}
+
+.upload-atlas .metadata-section,
+.upload-atlas .sample-upload-card,
+.upload-atlas .terms-card {
+    width: 100%;
+    max-width: 897px;
+    margin: 0 auto 20px;
+    padding-left: 16px;
+    padding-right: 16px;
+    box-sizing: border-box;
+}
+
+.upload-atlas .section-divider {
+    border-top: 1px solid #e5e7eb;
+    padding-top: 32px;
+}
+
+.upload-atlas .form-group input,
+.upload-atlas .form-group textarea,
+.upload-atlas .form-group select {
+    border: 0.6667px solid #d1d5dc;
+    background: #fff;
+    color: #000;
+    border-radius: 10px;
+    padding: 12px 16px;
+    height: 50px;
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-base);
+}
+
+.upload-atlas .form-group textarea {
+    min-height: 209px;
+}
+
+.upload-atlas .form-group input:focus,
+.upload-atlas .form-group textarea:focus,
+.upload-atlas .form-group select:focus {
+    border-color: #0b1834;
+    background: #fff;
+}
+
+.upload-atlas .three-col-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+}
+
+.upload-atlas .two-col-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+}
+
+.upload-atlas .with-counter .counter {
+    margin-top: 8px;
+    font-size: var(--font-size-sm);
+    color: #737373;
+    text-align: right;
+}
+
+.upload-atlas .with-counter .counter.danger {
+    color: #e31b0c;
+}
+
+.upload-stepper {
+    width: 100%;
+    max-width: 897px;
+    margin: 0 auto 24px;
+    padding: 0 16px;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    align-items: start;
+    position: relative;
+}
+
+.upload-stepper::before,
+.upload-stepper::after {
+    content: "";
+    position: absolute;
+    top: 20px;
+    height: 2px;
+    background: #e5e7eb;
+    z-index: 0;
+}
+
+.upload-stepper::before {
+    left: 149px;
+    right: calc(50% + 150px);
+}
+
+.upload-stepper::after {
+    left: calc(50% + 150px);
+    right: 149px;
+}
+
+.upload-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+}
+
+.upload-step-dot {
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    background: #e5e7eb;
+    color: #6a7282;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-sm);
+    font-weight: 400;
+}
+
+.upload-step-label {
+    margin-top: 8px;
+    font-size: var(--font-size-sm);
+    color: #737373;
+}
+
+.upload-step.active .upload-step-dot,
+.upload-step.done .upload-step-dot {
+    background: #0b1834;
+    color: #fff;
+    font-weight: 600;
+}
+
+.upload-step.error .upload-step-dot {
+    background: #b42318;
+    color: #fff;
+    font-weight: 600;
+}
+
+.upload-step.active .upload-step-label,
+.upload-step.done .upload-step-label {
+    color: #000;
+}
+
+.upload-step.error .upload-step-label {
+    color: #b42318;
+}
+
+.required-asterisk {
+    color: #b42318;
+    margin-left: 4px;
+    font-weight: 700;
+}
+
+.sample-upload-card {
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 14px;
+    padding: 24px;
+}
+
+.sample-upload-card h2 {
+    margin-bottom: 4px;
+}
+
+.sample-upload-card p {
+    color: #717182;
+    font-size: var(--font-size-sm);
+    margin-bottom: 16px;
+}
+
+.drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    min-height: 280px;
+    padding: 34px;
+    cursor: pointer;
+    text-align: center;
+}
+
+.drop-zone input {
+    display: none;
+}
+
+.drop-zone-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 999px;
+    background: rgba(3, 2, 19, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    margin-bottom: 16px;
+}
+
+.drop-zone-title {
+    font-size: 16px;
+    color: #0a0a0a;
+    margin-bottom: 4px;
+}
+
+.drop-zone-sub {
+    font-size: 14px;
+    color: #717182;
+    margin-bottom: 10px;
+}
+
+.browse-btn {
+    background: #030213;
+    color: #fff;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 14px;
+}
+
+.file-picked-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    min-height: 280px;
+    padding: 34px;
+}
+
+.file-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    color: #000;
+}
+
+.file-icon {
+    font-size: 20px;
+}
+
+.remove-file-btn {
+    background: none;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    color: #000;
+    padding: 4px;
+}
+
+.drop-zone-note {
+    margin-top: 10px;
+    color: #737373;
+    font-size: 14px;
+}
+
+.guidelines-acknowledgement {
+    margin-top: 32px;
+}
+
+.guidelines-acknowledgement h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #0a0a0a;
+}
+
+.guidelines-list {
+    padding-left: 20px;
+    margin-top: 12px;
+    margin-bottom: 24px;
+    color: #737373;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.guidelines-list li {
+    margin-bottom: 4px;
+}
+
+.upload-atlas .checkbox-group {
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.upload-atlas .checkbox-group input[type="checkbox"] {
+    width: 24px;
+    height: 24px;
+    margin: 0;
+}
+
+.upload-atlas .checkbox-group.compact-check input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+}
+
+.upload-atlas .checkbox-group label {
+    color: #737373;
+    font-size: 16px;
+    line-height: 19px;
+}
+
+.sensitive-choice-row {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-top: 10px;
+}
+
+.sensitive-choice {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #374151;
+}
+
+.sensitive-choice input[type="radio"] {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+}
+
+.sensitive-types-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 16px;
+    margin-top: 8px;
+}
+
+.link-btn {
+    border: 0;
+    background: transparent;
+    color: #155dfc;
+    text-decoration: underline;
+    font-size: 16px;
+    padding: 0;
+    margin: 8px 0;
+    cursor: pointer;
+}
+
+.legal-doc-links {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.terms-card {
+    border-radius: 10px;
+    background: #fff;
+    padding: 32px 0;
+    border: none;
+}
+
+.terms-card h2 {
+    font-size: 18px;
+    margin-bottom: 16px;
+}
+
+.terms-list {
+    padding-left: 20px;
+    margin-bottom: 32px;
+}
+
+.terms-list li {
+    margin-bottom: 8px;
+    color: #0a0a0a;
+    font-size: 14px;
+    line-height: 1.5;
+    list-style-type: disc;
+}
+
+.upload-atlas .checkbox-group {
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.upload-atlas .checkbox-group label {
+    color: #737373;
+    font-size: 14px;
+    line-height: 1.5;
+    margin-top: 2px;
+}
+
+.upload-atlas .checkbox-group.compact-check {
+    margin-bottom: 8px;
+    gap: 10px;
+}
+
+.note-text {
+    color: #4a5565;
+    font-style: italic;
+    font-size: 14px;
+    margin-top: 8px;
+}
+
+.upload-fixed-cta {
+    position: sticky;
+    bottom: 0;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    z-index: 3;
+    padding: 16px 0 8px;
+    border-top: 1px solid #e5e7eb;
+    background: #fff;
+    flex-wrap: wrap;
+}
+
+.upload-atlas .btn {
+    margin: 0;
+    border-radius: 8px;
+    padding: 10px 16px;
+    min-height: 40px;
+    box-shadow: none;
+    font-weight: 600;
+}
+
+.upload-atlas .btn-secondary {
+    background: #6b7280;
+    color: #fff;
+}
+
+.upload-atlas .figma-cta {
+    background: #00847c;
+    color: #fff;
+    border: none;
+}
+
+.upload-atlas .figma-cta:hover {
+    transform: none;
+    background: #00736c;
+}
+
+@media (max-width: 980px) {
+    .upload-atlas .upload-card {
+        padding: 48px 0 72px;
+    }
+
+    .upload-atlas .three-col-grid,
+    .upload-atlas .two-col-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .upload-stepper::before,
+    .upload-stepper::after {
+        display: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .upload-atlas .upload-card {
+        padding: 32px 0 56px;
+    }
+
+    .upload-atlas .form-group input,
+    .upload-atlas .form-group textarea,
+    .upload-atlas .form-group select {
+        height: auto;
+        min-height: 44px;
+    }
+
+    .upload-atlas .btn {
+        width: 100%;
+        margin-right: 0;
+    }
+}

@@ -1,0 +1,174 @@
+{
+  "Comment": "Vaidio Traffic Atlas end-to-end pipeline: frame extraction, embedding generation, and Bedrock tagging",
+  "StartAt": "RunFrameExtraction",
+  "States": {
+    "RunFrameExtraction": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::batch:submitJob.sync",
+      "Parameters": {
+        "JobName.$": "States.Format('vaidio-frame-extraction-{}', $.dataset_id)",
+        "JobQueue": "arn:aws:batch:us-east-1:<AWS_ACCOUNT_ID>:job-queue/vaidio-traffic-atlas-queu",
+        "JobDefinition": "arn:aws:batch:us-east-1:<AWS_ACCOUNT_ID>:job-definition/vaidio-frame-extraction-job:8",
+        "ContainerOverrides": {
+          "Environment": [
+            {
+              "Name": "DATASET_ID",
+              "Value.$": "$.dataset_id"
+            },
+            {
+              "Name": "BUCKET",
+              "Value.$": "$.bucket"
+            },
+            {
+              "Name": "ZIP_PREFIX",
+              "Value.$": "States.Format('{}sample/', $.dataset_root_prefix)"
+            },
+            {
+              "Name": "OUTPUT_PREFIX",
+              "Value.$": "States.Format('{}analysis/frames', $.dataset_root_prefix)"
+            },
+            {
+              "Name": "AWS_ACCESS_KEY_ID",
+              "Value.$": "$.client_aws_access_key_id"
+            },
+            {
+              "Name": "AWS_SECRET_ACCESS_KEY",
+              "Value.$": "$.client_aws_secret_access_key"
+            },
+            {
+              "Name": "MAX_WORKERS",
+              "Value": "4"
+            },
+            {
+              "Name": "FFMPEG_THREADS",
+              "Value": "2"
+            }
+          ]
+        }
+      },
+      "ResultPath": "$.frame_extraction",
+      "Next": "RunEmbeddingAndTagging"
+    },
+    "RunEmbeddingAndTagging": {
+      "Type": "Parallel",
+      "Branches": [
+        {
+          "StartAt": "RunEmbeddingGeneration",
+          "States": {
+            "RunEmbeddingGeneration": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::batch:submitJob.sync",
+              "Parameters": {
+                "JobName.$": "States.Format('vaidio-embedding-generation-{}', $.dataset_id)",
+                "JobQueue": "arn:aws:batch:us-east-1:<AWS_ACCOUNT_ID>:job-queue/vaidio-traffic-atlas-gpu-queue",
+                "JobDefinition": "arn:aws:batch:us-east-1:<AWS_ACCOUNT_ID>:job-definition/vaidio-frame-embedding-job:4",
+                "ContainerOverrides": {
+                  "Environment": [
+                    {
+                      "Name": "DATASET_ID",
+                      "Value.$": "$.dataset_id"
+                    },
+                    {
+                      "Name": "BUCKET",
+                      "Value.$": "$.bucket"
+                    },
+                    {
+                      "Name": "FRAMES_PREFIX",
+                      "Value.$": "States.Format('{}analysis/frames', $.dataset_root_prefix)"
+                    },
+                    {
+                      "Name": "OUTPUT_PREFIX",
+                      "Value.$": "States.Format('{}analysis/embeddings/clip', $.dataset_root_prefix)"
+                    },
+                    {
+                      "Name": "BATCH_SIZE",
+                      "Value": "64"
+                    },
+                    {
+                      "Name": "AWS_ACCESS_KEY_ID",
+                      "Value.$": "$.client_aws_access_key_id"
+                    },
+                    {
+                      "Name": "AWS_SECRET_ACCESS_KEY",
+                      "Value.$": "$.client_aws_secret_access_key"
+                    }
+                  ]
+                }
+              },
+              "ResultPath": "$.embedding_generation",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "StartBedrockTagging",
+          "States": {
+            "StartBedrockTagging": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:<AWS_ACCOUNT_ID>:function:vaidio-trafficatlas-start-bedrock-tagging",
+              "Parameters": {
+                "dataset_id.$": "$.dataset_id",
+                "bucket.$": "$.bucket",
+                "dataset_root_prefix.$": "$.dataset_root_prefix",
+                "frames_prefix.$": "States.Format('{}analysis/frames', $.dataset_root_prefix)",
+                "model_id": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+                "bedrock_role_arn": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/VaidioTrafficAtlasBedrockBatchRole"
+              },
+              "ResultPath": "$.tagging",
+              "Next": "WaitForBedrockBatch"
+            },
+            "WaitForBedrockBatch": {
+              "Type": "Wait",
+              "Seconds": 180,
+              "Next": "CheckBedrockBatchJob"
+            },
+            "CheckBedrockBatchJob": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:<AWS_ACCOUNT_ID>:function:vaidio-trafficatlas-check-bedrock-batch-job",
+              "Parameters": {
+                "jobArn.$": "$.tagging.jobArn"
+              },
+              "ResultPath": "$.bedrock_check",
+              "Next": "IsBedrockBatchDone"
+            },
+            "IsBedrockBatchDone": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.bedrock_check.state",
+                  "StringEquals": "SUCCEEDED",
+                  "Next": "FinalizeBedrockTagging"
+                },
+                {
+                  "Variable": "$.bedrock_check.state",
+                  "StringEquals": "FAILED",
+                  "Next": "BedrockBatchFailed"
+                }
+              ],
+              "Default": "WaitForBedrockBatch"
+            },
+            "FinalizeBedrockTagging": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:<AWS_ACCOUNT_ID>:function:vaidio-trafficatlas-finalize-bedrock-tagging",
+              "Parameters": {
+                "dataset_id.$": "$.dataset_id",
+                "bucket.$": "$.bucket",
+                "dataset_root_prefix.$": "$.dataset_root_prefix",
+                "bedrock_output_prefix.$": "$.tagging.bedrock_output_prefix"
+              },
+              "ResultPath": "$.finalize_tagging",
+              "End": true
+            },
+            "BedrockBatchFailed": {
+              "Type": "Fail",
+              "Error": "BedrockBatchFailed",
+              "Cause": "Bedrock batch inference job failed"
+            }
+          }
+        }
+      ],
+      "ResultPath": "$.parallel_results",
+      "End": true
+    }
+  }
+}

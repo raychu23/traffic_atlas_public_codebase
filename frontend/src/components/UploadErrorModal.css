@@ -1,0 +1,88 @@
+.upload-error-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 16, 20, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: upload-error-fade 0.18s ease;
+}
+
+.upload-error-modal {
+  width: min(520px, 92vw);
+  background: #fffdf7;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 18px 20px 16px;
+  animation: upload-error-rise 0.2s cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+.upload-error-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.upload-error-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #5a1f1f;
+}
+
+.upload-error-close {
+  background: transparent;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: #7a4a4a;
+}
+
+.upload-error-body {
+  font-size: 0.95rem;
+  color: #4a2c2c;
+  line-height: 1.45;
+  margin-bottom: 14px;
+}
+
+.upload-error-details {
+  margin: 10px 0 0 18px;
+  padding: 0;
+  color: #7a2e2e;
+  font-size: 0.9rem;
+}
+
+.upload-error-details li {
+  margin: 4px 0;
+}
+
+.upload-error-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.upload-error-dismiss {
+  background: #a33a3a;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.upload-error-dismiss:hover {
+  background: #8f2e2e;
+}
+
+@keyframes upload-error-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes upload-error-rise {
+  from { transform: translateY(6px) scale(0.98); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}

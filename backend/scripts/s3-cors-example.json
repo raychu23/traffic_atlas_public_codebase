@@ -1,0 +1,24 @@
+{
+  "CORSRules": [
+    {
+      "AllowedHeaders": ["*"],
+      "AllowedMethods": ["GET", "PUT", "POST", "HEAD", "DELETE"],
+      "AllowedOrigins": [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://traffic-atlas.example.com",
+        "https://testing.example.com",
+        "https://testing.dnc34k6hfrehq.amplifyapp.com",
+        "https://testing.d2jutt4g2m267w.amplifyapp.com",
+        "https://*.amplifyapp.com"
+      ],
+      "ExposeHeaders": [
+        "ETag",
+        "Content-Length",
+        "Content-Disposition",
+        "Content-Type"
+      ],
+      "MaxAgeSeconds": 3000
+    }
+  ]
+}

@@ -1,0 +1,341 @@
+/* =================== Download Metadata Form =================== */
+.download-page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 40px 24px 60px;
+}
+
+.download-page-title {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-extrabold);
+    color: var(--color-text);
+    margin-bottom: 4px;
+    line-height: var(--line-height-tight);
+}
+
+.download-page-subtitle {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    margin-bottom: 28px;
+}
+
+/* Dataset Summary Banner */
+.dataset-summary-banner {
+    background: var(--color-success-bg);
+    border: 1px solid var(--color-success-border);
+    border-radius: var(--radius-md);
+    padding: 16px 20px;
+    margin-bottom: 28px;
+}
+
+.dataset-summary-banner h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-success-text);
+    margin-bottom: 4px;
+}
+
+.dataset-summary-banner p {
+    font-size: 0.85rem;
+    color: #374151;
+    margin: 0;
+}
+
+.dataset-summary-banner .access-type {
+    display: inline-block;
+    margin-top: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    background: #2a7c6f;
+    color: white;
+    padding: 2px 10px;
+    border-radius: 10px;
+}
+
+/* Section Titles */
+.dl-section {
+    margin-bottom: 32px;
+}
+
+.dl-section-title {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--color-text-muted);
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+/* Form Grid */
+.dl-two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.dl-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 14px;
+}
+
+.dl-form-group label {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: #374151;
+}
+
+.dl-form-group input,
+.dl-form-group select,
+.dl-form-group textarea {
+    padding: 10px 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    background: #ffffff;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.dl-form-group input:focus,
+.dl-form-group select:focus,
+.dl-form-group textarea:focus {
+    border-color: #2a7c6f;
+    box-shadow: 0 0 0 3px rgba(42, 124, 111, 0.1);
+}
+
+.dl-form-group textarea {
+    resize: vertical;
+    min-height: 90px;
+}
+
+/* Checkboxes */
+.dl-checkbox-group {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.dl-checkbox-group:last-of-type {
+    border-bottom: none;
+}
+
+.dl-checkbox-group input[type="checkbox"] {
+    accent-color: #2a7c6f;
+    width: 16px;
+    height: 16px;
+    margin-top: 2px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.dl-checkbox-group label {
+    font-size: var(--font-size-sm);
+    color: #374151;
+    line-height: var(--line-height-base);
+    cursor: pointer;
+}
+
+/* Citation Box */
+.citation-box {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-left: 3px solid #2a7c6f;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-top: 12px;
+}
+
+.citation-box strong {
+    display: block;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-muted);
+    margin-bottom: 6px;
+}
+
+.citation-box p {
+    font-size: 0.85rem;
+    color: #374151;
+    font-style: italic;
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* Access Notice */
+.access-notice {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    background: #fafafa;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    line-height: 1.5;
+}
+
+/* Alerts */
+.dl-alert {
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: var(--font-size-sm);
+    margin-bottom: 16px;
+}
+
+.dl-download-progress {
+    margin-bottom: 16px;
+    padding: 16px;
+    border: 1px solid #d1fae5;
+    border-radius: 10px;
+    background: #f0fdf4;
+}
+
+.dl-download-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: #166534;
+}
+
+.dl-download-progress-bar {
+    width: 100%;
+    height: 10px;
+    background: #dcfce7;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.dl-download-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #2a7c6f 0%, #34d399 100%);
+    transition: width 0.2s ease;
+}
+
+.dl-download-progress-text {
+    margin-top: 10px;
+    font-size: var(--font-size-sm);
+    color: #166534;
+}
+
+.dl-alert.error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+}
+
+.dl-alert.success {
+    background: #f0fdf4;
+    border: 1px solid #a7f3d0;
+    color: var(--color-success-text);
+}
+
+.dl-error-list {
+    margin: 8px 0 0;
+    padding-left: 18px;
+}
+
+.dl-error-list li {
+    margin-bottom: 4px;
+}
+
+.dl-license {
+    margin: 10px 0 6px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: #f9fafb;
+}
+
+.dl-license summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: #374151;
+}
+
+.dl-license pre {
+    margin: 12px 0 0;
+    white-space: pre-wrap;
+    font-size: 0.8rem;
+    color: #374151;
+}
+
+/* Buttons */
+.dl-button-group {
+    display: flex;
+    gap: 12px;
+    padding: 16px 0 12px;
+    border-top: 1px solid #e5e7eb;
+    margin-top: 16px;
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    z-index: 2;
+}
+
+.dl-btn-primary {
+    padding: 11px 28px;
+    background: #2a7c6f;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.dl-btn-primary:hover:not(:disabled) {
+    background: #245f54;
+}
+
+.dl-btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.dl-btn-secondary {
+    padding: 11px 24px;
+    background: white;
+    color: #374151;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.dl-btn-secondary:hover {
+    border-color: #9ca3af;
+}
+
+@media (max-width: 640px) {
+    .download-page {
+        padding: 24px 16px 48px;
+    }
+
+    .dl-two-col {
+        grid-template-columns: 1fr;
+    }
+
+    .dl-button-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .dl-btn-primary,
+    .dl-btn-secondary {
+        width: 100%;
+        text-align: center;
+    }
+}

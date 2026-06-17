@@ -1,0 +1,10 @@
+FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
+
+WORKDIR /app
+
+COPY requirements-embedding.txt .
+RUN pip install --no-cache-dir -r requirements-embedding.txt
+
+COPY embedding-generation.py .
+
+CMD ["python", "embedding-generation.py"]

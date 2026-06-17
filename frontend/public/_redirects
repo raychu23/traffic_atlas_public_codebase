@@ -1,0 +1,3 @@
+# Serve real static assets first; SPA fallback only for app routes (404 -> index.html).
+/static/*  /static/:splat  200
+</^[^.]+$|\.(?!(css|gif|ico|jpg|jpeg|js|png|txt|svg|woff|woff2|ttf|map|json|webp)$)([^.]+$)/>  /index.html  200
