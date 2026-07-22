@@ -1,44 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import './UploadLanding.css';
-import { SAMPLE_UPLOAD_LIMIT_BYTES, formatUploadLimit } from '../config/uploadLimits';
-
-const PROCESS_STEPS = [
-  {
-    icon: (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M8 3.75h5.5L18.25 8.5V19A1.25 1.25 0 0 1 17 20.25H8A1.25 1.25 0 0 1 6.75 19V5A1.25 1.25 0 0 1 8 3.75Z" />
-        <path d="M13.5 3.75V8.5h4.75" />
-        <path d="M9.25 12h5.5" />
-        <path d="M9.25 15.5h5.5" />
-      </svg>
-    ),
-    title: 'Submission Request Form',
-    description: 'Fill out the form and upload a sample of your dataset, which we will review.',
-  },
-  {
-    icon: (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="12" r="8.25" />
-        <path d="M12 7.75v4.25l2.5 1.5" />
-      </svg>
-    ),
-    title: 'Wait',
-    description: 'This review process usually takes ...',
-  },
-  {
-    icon: (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 15.75V6" />
-        <path d="m8.25 9.5 3.75-3.75 3.75 3.75" />
-        <path d="M5.75 16.25v1.5A1.5 1.5 0 0 0 7.25 19.25h9.5a1.5 1.5 0 0 0 1.5-1.5v-1.5" />
-      </svg>
-    ),
-    title: 'Data Upload',
-    description: 'Input further information about your dataset, upload your full dataset as a zip, and make your preferred citation.',
-  },
-];
-
 function UploadLanding() {
   const navigate = useNavigate();
   const userId = localStorage.getItem('userId');
@@ -49,6 +11,14 @@ function UploadLanding() {
       return;
     }
     navigate('/upload/metadata');
+  };
+
+  const handleVideoUpload = () => {
+    if (!userId) {
+      navigate('/register');
+      return;
+    }
+    navigate('/upload/video');
   };
 
   return (
@@ -80,65 +50,54 @@ function UploadLanding() {
         </div>
       </section>
 
-      <section className="upload-process-wrap">
-        <div className="process-left-col">
-          <div className="process-header">
-            <h2>Uploading Data: The 3-Step Process</h2>
-            <button className="upload-pill-btn upload-process-cta" onClick={handleUpload}>
-              Upload Data
-            </button>
-          </div>
-
-          <div className="process-grid">
-            {PROCESS_STEPS.map((step, index) => (
-              <article
-                className={`step-item${index === 1 ? ' step-item-divider' : ''}${index === 2 ? ' step-item-wide' : ''}`}
-                key={step.title}
-              >
-                <div className="step-icon">{step.icon}</div>
-                <h3>{step.title}</h3>
-                <p>{step.description}</p>
-              </article>
-            ))}
-          </div>
+      <section className="upload-choice-wrap" aria-labelledby="upload-choice-title">
+        <div className="upload-choice-heading">
+          <span className="eyebrow">Choose upload type</span>
+          <h2 id="upload-choice-title">What are you uploading?</h2>
+          <p>
+            Dataset upload is already supported. Use Video upload when you want to submit raw
+            traffic footage for video-specific checks and processing.
+          </p>
         </div>
 
-        <aside className="sample-panel">
-          <div className="sample-shell">
-            <div className="sample-panel-header">
-              <div>
-                <div className="sample-head">Upload Sample Dataset</div>
-                <div className="sample-sub">
-                  Upload a compressed (.zip) file • Recommended size &lt;{formatUploadLimit(SAMPLE_UPLOAD_LIMIT_BYTES)}
-                </div>
-              </div>
+        <div className="upload-choice-grid">
+          <article className="upload-choice-card">
+            <div className="choice-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M4.75 6.75A2 2 0 0 1 6.75 4.75h10.5a2 2 0 0 1 2 2v10.5a2 2 0 0 1-2 2H6.75a2 2 0 0 1-2-2V6.75Z" />
+                <path d="M8 9h8" />
+                <path d="M8 12h8" />
+                <path d="M8 15h5" />
+              </svg>
             </div>
+            <h3>Dataset</h3>
+            <p>
+              Upload a sample ZIP, add metadata, accept terms, and continue through the existing
+              dataset review flow.
+            </p>
+            <button type="button" className="choice-button" onClick={handleUpload}>
+              Start Dataset Upload
+            </button>
+          </article>
 
-            <div className="sample-zone">
-              <div className="sample-zone-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                  <path d="M12 15.75V6" />
-                  <path d="m8.25 9.5 3.75-3.75 3.75 3.75" />
-                  <path d="M5.75 16.25v1.5A1.5 1.5 0 0 0 7.25 19.25h9.5a1.5 1.5 0 0 0 1.5-1.5v-1.5" />
-                </svg>
-              </div>
-              <p>Drag and drop your file here</p>
-              <span>or</span>
-              <button type="button" onClick={handleUpload}>Browse Files</button>
+          <article className="upload-choice-card featured">
+            <div className="choice-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M5.25 7.25A2.25 2.25 0 0 1 7.5 5h6.25A2.25 2.25 0 0 1 16 7.25v9.5A2.25 2.25 0 0 1 13.75 19H7.5a2.25 2.25 0 0 1-2.25-2.25v-9.5Z" />
+                <path d="m16 10 3.25-2v8L16 14" />
+                <path d="M8.25 8.5h4.25" />
+              </svg>
             </div>
-
-            <div className="sample-meta-row">
-              <div className="sample-note">This should be a representative sample, not your full dataset.</div>
-              <button
-                type="button"
-                className="sample-footnote-link"
-                onClick={() => navigate('/upload/guidelines')}
-              >
-                Review upload guidelines
-              </button>
-            </div>
-          </div>
-        </aside>
+            <h3>Video</h3>
+            <p>
+              Upload MP4, MOV, AVI, MKV, WebM, or WMV traffic footage, then review extracted
+              metadata and frame previews.
+            </p>
+            <button type="button" className="choice-button primary" onClick={handleVideoUpload}>
+              Start Video Upload
+            </button>
+          </article>
+        </div>
       </section>
     </div>
   );

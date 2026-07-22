@@ -82,7 +82,7 @@ function DatasetDetail() {
     return () => {
       cancelled = true;
     };
-  }, [datasetId]);
+  }, [datasetId, useDemoBundle]);
 
   useEffect(() => {
     if (!datasetId) {
@@ -120,7 +120,7 @@ function DatasetDetail() {
     return () => {
       cancelled = true;
     };
-  }, [datasetId]);
+  }, [datasetId, useDemoBundle]);
 
   const handleDownloadSample = async () => {
     setDownloadError("");

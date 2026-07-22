@@ -17,7 +17,7 @@ function parseJwt(token) {
     if (!payload) return null;
     // Add base64 padding (JWT uses unpadded base64url)
     const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64 + '=='.slice(0, (4 - base64.length % 4) % 4);
+    const padded = base64 + '=='.slice(0, (4 - (base64.length % 4)) % 4);
     return JSON.parse(atob(padded));
   } catch {
     return null;
@@ -58,13 +58,44 @@ function resolveIsAdmin() {
   return false;
 }
 
+function isDevAuthEnabled() {
+  return process.env.REACT_APP_DEV_AUTH_ENABLED === 'true';
+}
+
+function ensureDevProfile() {
+  localStorage.setItem('authToken', 'dev-local-token');
+  if (!localStorage.getItem('userId')) {
+    localStorage.setItem('userId', 'dev-local-user');
+  }
+  if (!localStorage.getItem('userName')) {
+    localStorage.setItem('userName', 'Local Dev User');
+  }
+  if (!localStorage.getItem('userEmail')) {
+    localStorage.setItem('userEmail', 'dev@traffic-atlas.local');
+  }
+  if (!localStorage.getItem('userOrganization')) {
+    localStorage.setItem('userOrganization', 'Traffic Atlas Local');
+  }
+  if (!localStorage.getItem('userRole')) {
+    localStorage.setItem('userRole', 'developer');
+  }
+}
 
 /**
  * getAuthState — returns the current auth state.
  * Used by ProtectedRoute, AdminRoute, and Navbar.
  */
 export function getAuthState() {
-  const token   = localStorage.getItem('authToken');
+  if (isDevAuthEnabled()) {
+    ensureDevProfile();
+    return {
+      token: 'dev-local-token',
+      isLoggedIn: true,
+      isAdmin: false,
+    };
+  }
+
+  const token = localStorage.getItem('authToken');
   const isAdmin = resolveIsAdmin();
   const isLoggedIn = isTokenValid(token);
 
@@ -79,8 +110,8 @@ export function getAuthState() {
  * saveAuthTokens — persist all Cognito tokens after login/register.
  */
 export function saveAuthTokens({ token, idToken, refreshToken }) {
-  if (token)        localStorage.setItem('authToken',    token);
-  if (idToken)      localStorage.setItem('idToken',      idToken);
+  if (token) localStorage.setItem('authToken', token);
+  if (idToken) localStorage.setItem('idToken', idToken);
   if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
 
   // Cache isAdmin from idToken claims for quick checks

@@ -10,6 +10,7 @@ import {
 } from '../services/api';
 import './UploadMetadata.css';
 import UploadErrorModal from './UploadErrorModal';
+import DatasetUploadProcess from './DatasetUploadProcess';
 import { SAMPLE_UPLOAD_LIMIT_BYTES, formatBytes, formatUploadLimit } from '../config/uploadLimits';
 
 const STEPS = ['Core Metadata', 'Files & Advanced', 'Terms & Conditions'];
@@ -43,6 +44,7 @@ function UploadMetadata() {
   const [errorDetails, setErrorDetails] = useState([]);
   const [stepErrors, setStepErrors] = useState({});
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+  const [showMetadataForm, setShowMetadataForm] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -150,8 +152,7 @@ function UploadMetadata() {
     });
   };
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
+  const handleFileSelect = (file) => {
     if (!file) {
       setZipFile(null);
       setShowErrorModal(false);
@@ -173,6 +174,22 @@ function UploadMetadata() {
     setError('');
     setShowErrorModal(false);
     setZipFile(file);
+  };
+
+  const handleSampleContinue = () => {
+    if (!zipFile) {
+      raiseError('Please upload a sample dataset ZIP file before continuing.');
+      return;
+    }
+    setError('');
+    setShowErrorModal(false);
+    setShowMetadataForm(true);
+    scrollToTop();
+  };
+
+  const handleRemoveSampleFile = () => {
+    setZipFile(null);
+    setShowMetadataForm(false);
   };
 
   const validateStep = (stepToValidate) => {
@@ -453,6 +470,28 @@ function UploadMetadata() {
   return (
     <div className="container upload-atlas">
       <div className="card upload-card">
+        {!showMetadataForm ? (
+          <>
+            {error && <div className="alert alert-error">{error}</div>}
+            {showErrorModal && (
+              <UploadErrorModal
+                message={error}
+                details={errorDetails}
+                onClose={() => setShowErrorModal(false)}
+              />
+            )}
+            <DatasetUploadProcess
+              zipFile={zipFile}
+              fileSizeLabel={fileSizeLabel}
+              onFileSelect={handleFileSelect}
+              onRemoveFile={handleRemoveSampleFile}
+              onContinue={handleSampleContinue}
+              onOpenGuidelines={() => window.open('/upload/guidelines', '_blank', 'noopener,noreferrer')}
+            />
+          </>
+        ) : (
+          <>
+
         <div className="upload-stepper">
           {STEPS.map((label, idx) => {
             const number = idx + 1;
@@ -614,8 +653,10 @@ function UploadMetadata() {
                   </div>
 
                   <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                    <label className="plain-text">Contains Sensitive Data?*</label>
-                    <div className="sensitive-choice-row">
+                    <div className="plain-text" id="contains-sensitive-data-label">
+                      Contains Sensitive Data?*
+                    </div>
+                    <div className="sensitive-choice-row" aria-labelledby="contains-sensitive-data-label">
                       <label className="sensitive-choice">
                         <input
                           type="radio"
@@ -640,8 +681,10 @@ function UploadMetadata() {
                   {formData.contains_sensitive_data && (
                     <>
                       <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                        <label>Sensitive Data Type*</label>
-                        <div className="sensitive-types-grid">
+                        <div className="plain-text" id="sensitive-data-type-label">
+                          Sensitive Data Type*
+                        </div>
+                        <div className="sensitive-types-grid" aria-labelledby="sensitive-data-type-label">
                         {SENSITIVE_DATA_OPTIONS.map((option) => {
                           const optionId = `sensitive-${option.toLowerCase()}`;
                           return (
@@ -690,7 +733,12 @@ function UploadMetadata() {
                       <div className="drop-zone-title">Drag and drop your file here</div>
                       <div className="drop-zone-sub">or</div>
                       <span className="browse-btn">Browse Files</span>
-                      <input id="zipFile" type="file" accept=".zip" onChange={handleFileChange} />
+                      <input
+                        id="zipFile"
+                        type="file"
+                        accept=".zip"
+                        onChange={(event) => handleFileSelect(event.target.files?.[0])}
+                      />
                     </label>
                   )}
                 </div>
@@ -833,6 +881,8 @@ function UploadMetadata() {
             )}
           </div>
         </form>
+          </>
+        )}
       </div>
     </div>
   );

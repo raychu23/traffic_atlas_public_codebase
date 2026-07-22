@@ -1,24 +1,32 @@
-import axios from "axios";
-import { clearAuthTokens, notifyAuthChanged } from "./authState";
+import axios from 'axios';
+import { clearAuthTokens, notifyAuthChanged } from './authState';
+
+function getDefaultApiUrl() {
+  if (typeof window === 'undefined') return 'http://localhost:5001';
+  const localHosts = new Set(['localhost', '127.0.0.1', '::1']);
+  if (localHosts.has(window.location.hostname)) {
+    return `${window.location.protocol}//${window.location.hostname}:5001`;
+  }
+  return window.location.origin;
+}
 
 const rawApiUrl =
-  process.env.REACT_APP_API_URL_TESTING ||
-  "https://api.example.com";
-const normalizedApiUrl = rawApiUrl.replace(/\/+$/, "");
-const API_BASE_URL = normalizedApiUrl.endsWith("/api")
+  process.env.REACT_APP_API_URL || process.env.REACT_APP_API_URL_TESTING || getDefaultApiUrl();
+const normalizedApiUrl = rawApiUrl.replace(/\/+$/, '');
+const API_BASE_URL = normalizedApiUrl.endsWith('/api')
   ? normalizedApiUrl
   : `${normalizedApiUrl}/api`;
-export const API_PUBLIC_BASE_URL = API_BASE_URL.replace(/\/api$/, "");
+export const API_PUBLIC_BASE_URL = API_BASE_URL.replace(/\/api$/, '');
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
-    "Content-Type": "application/json",
+    'Content-Type': 'application/json',
   },
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("authToken");
+  const token = localStorage.getItem('authToken');
   if (token) {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
@@ -30,13 +38,13 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
-    const url = error.config?.url || "";
-    if (status === 401 && !url.includes("/users/login")) {
+    const url = error.config?.url || '';
+    if (status === 401 && !url.includes('/users/login')) {
       clearAuthTokens();
-      localStorage.setItem("sessionExpired", "true");
+      localStorage.setItem('sessionExpired', 'true');
       notifyAuthChanged();
-      if (window.location.pathname !== "/login") {
-        window.location.href = "/login";
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
       }
     }
     return Promise.reject(error);
@@ -44,12 +52,12 @@ api.interceptors.response.use(
 );
 
 export const registerUser = async (userData) => {
-  const response = await api.post("/users/register", userData);
+  const response = await api.post('/users/register', userData);
   return response.data;
 };
 
 export const confirmRegistration = async (email, code) => {
-  const response = await api.post("/users/confirm-registration", {
+  const response = await api.post('/users/confirm-registration', {
     email,
     code,
   });
@@ -57,17 +65,17 @@ export const confirmRegistration = async (email, code) => {
 };
 
 export const loginUser = async (credentials) => {
-  const response = await api.post("/users/login", credentials);
+  const response = await api.post('/users/login', credentials);
   return response.data;
 };
 
 export const forgotPassword = async (email) => {
-  const response = await api.post("/users/forgot-password", { email });
+  const response = await api.post('/users/forgot-password', { email });
   return response.data;
 };
 
 export const confirmPassword = async (email, code, newPassword) => {
-  const response = await api.post("/users/confirm-password", {
+  const response = await api.post('/users/confirm-password', {
     email,
     code,
     newPassword,
@@ -76,12 +84,12 @@ export const confirmPassword = async (email, code, newPassword) => {
 };
 
 export const getCurrentUser = async () => {
-  const response = await api.get("/auth/me");
+  const response = await api.get('/auth/me');
   return response.data;
 };
 
 export const getUploadTerms = async () => {
-  const response = await api.get("/legal/upload-terms");
+  const response = await api.get('/legal/upload-terms');
   return response.data;
 };
 
@@ -91,25 +99,21 @@ export const getUser = async (userId) => {
 };
 
 export const getUserDashboard = async () => {
-  const response = await api.get("/users/me/dashboard");
+  const response = await api.get('/users/me/dashboard');
   return response.data;
 };
 
 // Submit upload request with sample data
-export const submitUploadRequest = async (
-  metadata,
-  sampleFile,
-  onUploadProgress,
-) => {
+export const submitUploadRequest = async (metadata, sampleFile, onUploadProgress) => {
   const formData = new FormData();
-  formData.append("metadata", JSON.stringify(metadata));
+  formData.append('metadata', JSON.stringify(metadata));
   if (sampleFile) {
-    formData.append("sampleFile", sampleFile);
+    formData.append('sampleFile', sampleFile);
   }
 
-  const response = await api.post("/datasets/upload-request", formData, {
+  const response = await api.post('/datasets/upload-request', formData, {
     headers: {
-      "Content-Type": "multipart/form-data",
+      'Content-Type': 'multipart/form-data',
     },
     onUploadProgress,
   });
@@ -118,17 +122,12 @@ export const submitUploadRequest = async (
 
 // Multipart sample upload (direct to S3)
 export const initiateSampleMultipartUpload = async (payload) => {
-  const response = await api.post(
-    "/datasets/upload-request/multipart/initiate",
-    payload,
-  );
+  const response = await api.post('/datasets/upload-request/multipart/initiate', payload);
   return response.data;
 };
 
 export const getSampleMultipartParts = async (requestId) => {
-  const response = await api.get(
-    `/datasets/upload-request/${requestId}/multipart/parts`,
-  );
+  const response = await api.get(`/datasets/upload-request/${requestId}/multipart/parts`);
   return response.data;
 };
 
@@ -149,66 +148,81 @@ export const completeSampleMultipartUpload = async (requestId, payload) => {
 };
 
 export const abortSampleMultipartUpload = async (requestId) => {
-  const response = await api.post(
-    `/datasets/upload-request/${requestId}/multipart/abort`,
-  );
+  const response = await api.post(`/datasets/upload-request/${requestId}/multipart/abort`);
   return response.data;
 };
 
 // Upload full dataset after approval
 export const uploadFullDataset = async (datasetId, fullFile) => {
   const formData = new FormData();
-  formData.append("fullFile", fullFile);
+  formData.append('fullFile', fullFile);
 
-  const response = await api.post(
-    `/datasets/${datasetId}/upload-full`,
-    formData,
-    {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+  const response = await api.post(`/datasets/${datasetId}/upload-full`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
     },
-  );
+  });
+  return response.data;
+};
+
+export const validateTrafficVideoUpload = async (videoFile, onUploadProgress) => {
+  const formData = new FormData();
+  formData.append('videoFile', videoFile);
+
+  const response = await api.post('/videos/validate-upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    onUploadProgress,
+  });
+  return response.data;
+};
+
+export const getTrafficVideoJob = async (videoId) => {
+  const response = await api.get(`/videos/${videoId}`);
+  return response.data;
+};
+
+export const restartTrafficVideoProcessing = async (videoId) => {
+  const response = await api.post(`/videos/${videoId}/process`);
+  return response.data;
+};
+
+export const updateTrafficVideoZones = async (videoId, zones) => {
+  const response = await api.put(`/videos/${videoId}/zones`, { zones });
+  return response.data;
+};
+
+export const getTrafficVideoArtifact = async (videoId, artifact) => {
+  const response = await api.get(`/videos/${videoId}/artifacts/${artifact}`, {
+    responseType: 'blob',
+  });
   return response.data;
 };
 
 // Multipart full dataset upload (direct to S3)
 export const initiateMultipartUpload = async (datasetId, payload) => {
-  const response = await api.post(
-    `/datasets/${datasetId}/upload-full/multipart/initiate`,
-    payload,
-  );
+  const response = await api.post(`/datasets/${datasetId}/upload-full/multipart/initiate`, payload);
   return response.data;
 };
 
 export const getMultipartSession = async (datasetId) => {
-  const response = await api.get(
-    `/datasets/${datasetId}/upload-full/multipart/session`,
-  );
+  const response = await api.get(`/datasets/${datasetId}/upload-full/multipart/session`);
   return response.data;
 };
 
 export const getMultipartPartUrl = async (datasetId, payload) => {
-  const response = await api.post(
-    `/datasets/${datasetId}/upload-full/multipart/part-url`,
-    payload,
-  );
+  const response = await api.post(`/datasets/${datasetId}/upload-full/multipart/part-url`, payload);
   return response.data;
 };
 
 export const listMultipartParts = async (datasetId, params) => {
-  const response = await api.get(
-    `/datasets/${datasetId}/upload-full/multipart/parts`,
-    { params },
-  );
+  const response = await api.get(`/datasets/${datasetId}/upload-full/multipart/parts`, { params });
   return response.data;
 };
 
 export const completeMultipartUpload = async (datasetId, payload) => {
-  const response = await api.post(
-    `/datasets/${datasetId}/upload-full/multipart/complete`,
-    payload,
-  );
+  const response = await api.post(`/datasets/${datasetId}/upload-full/multipart/complete`, payload);
   return response.data;
 };
 
@@ -235,10 +249,7 @@ export const getDatasetFilterTags = async (datasetId) => {
 /** Spherical PCA of CLIP embeddings for dataset detail visualization */
 export const getSphericalPcaEmbeddings = async (datasetId, videoId = null) => {
   const params = videoId ? { video_id: videoId } : {};
-  const response = await api.get(
-    `/datasets/${datasetId}/embeddings/spherical-pca`,
-    { params },
-  );
+  const response = await api.get(`/datasets/${datasetId}/embeddings/spherical-pca`, { params });
   return response.data;
 };
 
@@ -249,15 +260,12 @@ export const listEmbeddingVideos = async (datasetId) => {
 };
 
 export const abortMultipartUpload = async (datasetId, payload) => {
-  const response = await api.post(
-    `/datasets/${datasetId}/upload-full/multipart/abort`,
-    payload,
-  );
+  const response = await api.post(`/datasets/${datasetId}/upload-full/multipart/abort`, payload);
   return response.data;
 };
 
 export const getNotificationSummary = async () => {
-  const response = await api.get("/notifications");
+  const response = await api.get('/notifications');
   return response.data;
 };
 
@@ -267,7 +275,7 @@ export const uploadDataset = async (metadata, zipFile) => {
 };
 
 export const getDatasets = async (filters = {}) => {
-  const response = await api.get("/datasets", { params: filters });
+  const response = await api.get('/datasets', { params: filters });
   return response.data;
 };
 
@@ -287,9 +295,7 @@ export const getDatasetSampleDownloadUrl = async (datasetId) => {
 };
 
 export const getAdminSampleDownloadUrl = async (requestId) => {
-  const response = await api.get(
-    `/admin/upload-requests/${requestId}/sample-url`,
-  );
+  const response = await api.get(`/admin/upload-requests/${requestId}/sample-url`);
   return response.data;
 };
 
@@ -299,13 +305,13 @@ export const getAdminSampleDownloadUrl = async (requestId) => {
  */
 export async function startDatasetFileDownload(meta) {
   if (!meta?.success || !meta?.downloadUrl) {
-    throw new Error(meta?.error || "Failed to prepare download.");
+    throw new Error(meta?.error || 'Failed to prepare download.');
   }
 
   if (meta.direct) {
-    const link = document.createElement("a");
+    const link = document.createElement('a');
     link.href = meta.downloadUrl;
-    link.rel = "noopener noreferrer";
+    link.rel = 'noopener noreferrer';
     if (meta.fileName) {
       link.download = meta.fileName;
     }
@@ -315,15 +321,15 @@ export async function startDatasetFileDownload(meta) {
     return meta;
   }
 
-  const token = localStorage.getItem("authToken");
+  const token = localStorage.getItem('authToken');
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
-  const url = meta.downloadUrl.startsWith("http")
+  const url = meta.downloadUrl.startsWith('http')
     ? meta.downloadUrl
     : `${API_PUBLIC_BASE_URL}${meta.downloadUrl}`;
 
-  const response = await fetch(url, { method: "GET", headers });
+  const response = await fetch(url, { method: 'GET', headers });
   if (!response.ok) {
-    let message = "Unable to download file.";
+    let message = 'Unable to download file.';
     try {
       const data = await response.json();
       message = data?.error || message;
@@ -333,18 +339,16 @@ export async function startDatasetFileDownload(meta) {
     throw new Error(message);
   }
 
-  const contentDisposition = response.headers.get("content-disposition") || "";
-  let filename = meta.fileName || "download.zip";
-  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(
-    contentDisposition,
-  );
+  const contentDisposition = response.headers.get('content-disposition') || '';
+  let filename = meta.fileName || 'download.zip';
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(contentDisposition);
   if (match && match[1]) {
     filename = decodeURIComponent(match[1]);
   }
 
   const blob = await response.blob();
   const objectUrl = window.URL.createObjectURL(blob);
-  const link = document.createElement("a");
+  const link = document.createElement('a');
   link.href = objectUrl;
   link.download = filename;
   document.body.appendChild(link);
@@ -355,18 +359,18 @@ export async function startDatasetFileDownload(meta) {
 }
 
 export const getAuthMe = async () => {
-  const response = await api.get("/auth/me");
+  const response = await api.get('/auth/me');
   return response.data;
 };
 
 export const getMyProfile = async () => {
   try {
-    const response = await api.get("/users/me");
+    const response = await api.get('/users/me');
     return response.data;
   } catch (err) {
     const status = err.response?.status;
     if (status === 404 || status === 500) {
-      const fallback = await api.get("/auth/me");
+      const fallback = await api.get('/auth/me');
       return fallback.data;
     }
     throw err;
@@ -375,7 +379,7 @@ export const getMyProfile = async () => {
 
 export const updateMyProfile = async (payload) => {
   try {
-    const response = await api.put("/users/me", payload);
+    const response = await api.put('/users/me', payload);
     return response.data;
   } catch (err) {
     const status = err.response?.status;
@@ -383,8 +387,7 @@ export const updateMyProfile = async (payload) => {
       // Backend not yet deployed or Cognito admin creds missing — return a soft failure
       return {
         success: false,
-        error:
-          "Profile update is temporarily unavailable. Please try again later.",
+        error: 'Profile update is temporarily unavailable. Please try again later.',
       };
     }
     throw err;
@@ -392,15 +395,11 @@ export const updateMyProfile = async (payload) => {
 };
 
 export const deleteMyProfile = async () => {
-  const response = await api.delete("/users/me");
+  const response = await api.delete('/users/me');
   return response.data;
 };
 
-export const downloadDataset = async (
-  datasetId,
-  downloaderMetadata,
-  consents,
-) => {
+export const downloadDataset = async (datasetId, downloaderMetadata, consents) => {
   const response = await api.post(`/datasets/${datasetId}/download`, {
     downloaderMetadata,
     consents,
@@ -428,7 +427,7 @@ export const downloadFullDataset = async (datasetId) => {
 
 // Admin APIs
 export const getUploadRequests = async () => {
-  const response = await api.get("/admin/upload-requests");
+  const response = await api.get('/admin/upload-requests');
   return response.data;
 };
 
@@ -438,36 +437,27 @@ export const getUploadRequest = async (requestId) => {
 };
 
 export const approveUploadRequest = async (requestId, adminNotes) => {
-  const response = await api.post(
-    `/admin/upload-requests/${requestId}/approve`,
-    {
-      adminNotes,
-    },
-  );
+  const response = await api.post(`/admin/upload-requests/${requestId}/approve`, {
+    adminNotes,
+  });
   return response.data;
 };
 
 export const clarifyUploadRequest = async (requestId, adminNotes) => {
-  const response = await api.post(
-    `/admin/upload-requests/${requestId}/comment`,
-    { adminNotes },
-  );
+  const response = await api.post(`/admin/upload-requests/${requestId}/comment`, { adminNotes });
   return response.data;
 };
 
 export const rejectUploadRequest = async (requestId, reason, adminNotes) => {
-  const response = await api.post(
-    `/admin/upload-requests/${requestId}/reject`,
-    {
-      reason,
-      adminNotes,
-    },
-  );
+  const response = await api.post(`/admin/upload-requests/${requestId}/reject`, {
+    reason,
+    adminNotes,
+  });
   return response.data;
 };
 
 export const getDownloadRequests = async () => {
-  const response = await api.get("/admin/download-requests");
+  const response = await api.get('/admin/download-requests');
   return response.data;
 };
 
@@ -478,12 +468,12 @@ export const getDownloadRequest = async (requestId) => {
 
 // Admin User Management
 export const getAdminUsers = async () => {
-  const response = await api.get("/admin/users");
+  const response = await api.get('/admin/users');
   return response.data;
 };
 
 export const getRequestHistory = async () => {
-  const response = await api.get("/admin/requests/history");
+  const response = await api.get('/admin/requests/history');
   return response.data;
 };
 
@@ -500,31 +490,22 @@ export const setAdminUser = async (userId, isAdmin) => {
 };
 
 export const approveDownloadRequest = async (requestId, adminNotes) => {
-  const response = await api.post(
-    `/admin/download-requests/${requestId}/approve`,
-    {
-      adminNotes,
-    },
-  );
+  const response = await api.post(`/admin/download-requests/${requestId}/approve`, {
+    adminNotes,
+  });
   return response.data;
 };
 
 export const clarifyDownloadRequest = async (requestId, adminNotes) => {
-  const response = await api.post(
-    `/admin/download-requests/${requestId}/comment`,
-    { adminNotes },
-  );
+  const response = await api.post(`/admin/download-requests/${requestId}/comment`, { adminNotes });
   return response.data;
 };
 
 export const rejectDownloadRequest = async (requestId, reason, adminNotes) => {
-  const response = await api.post(
-    `/admin/download-requests/${requestId}/reject`,
-    {
-      reason,
-      adminNotes,
-    },
-  );
+  const response = await api.post(`/admin/download-requests/${requestId}/reject`, {
+    reason,
+    adminNotes,
+  });
   return response.data;
 };
 
@@ -536,7 +517,7 @@ export const getMessages = async (type, requestId) => {
   return response.data;
 };
 
-export const sendMessage = async (type, requestId, text, actingAs = "user") => {
+export const sendMessage = async (type, requestId, text, actingAs = 'user') => {
   const response = await api.post(`/requests/${type}/${requestId}/messages`, {
     text,
     actingAs,
