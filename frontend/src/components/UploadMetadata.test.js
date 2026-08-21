@@ -59,6 +59,9 @@ describe('UploadMetadata sample upload gate', () => {
 
     expect(container.textContent).toContain('Submit a dataset');
     expect(container.textContent).toContain('Upload Sample Dataset');
+    expect(container.textContent).toContain('Choose a sample');
+    expect(container.textContent).toContain('Submit for review');
+    expect(container.textContent).not.toContain('Describe the dataset');
     expect(container.textContent).not.toContain('Core Metadata*');
   });
 

@@ -46,13 +46,6 @@
   padding-left: 34px;
 }
 
-.dataset-step-item-wide {
-  grid-column: 1 / span 2;
-  max-width: 420px;
-  justify-self: center;
-  margin-top: 2px;
-}
-
 .dataset-step-icon {
   width: 34px;
   height: 34px;
@@ -257,10 +250,5 @@
   .dataset-step-item-divider {
     border-left: 0;
     padding-left: 0;
-  }
-
-  .dataset-step-item-wide {
-    grid-column: auto;
-    max-width: none;
   }
 }

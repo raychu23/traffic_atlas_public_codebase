@@ -11,6 +11,8 @@ __pycache__/
 
 # Build outputs
 frontend/build/
+playwright-report/
+test-results/
 
 # Database and uploads
 backend/uploads/

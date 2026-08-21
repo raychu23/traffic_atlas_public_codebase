@@ -19,16 +19,6 @@ const PROCESS_STEPS = [
   {
     icon: (
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="12" r="8.25" />
-        <path d="M12 7.75v4.25l2.5 1.5" />
-      </svg>
-    ),
-    title: 'Describe the dataset',
-    description: 'Add ownership, collection, access, licensing, and contact metadata.',
-  },
-  {
-    icon: (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M12 15.75V6" />
         <path d="m8.25 9.5 3.75-3.75 3.75 3.75" />
         <path d="M5.75 16.25v1.5A1.5 1.5 0 0 0 7.25 19.25h9.5a1.5 1.5 0 0 0 1.5-1.5v-1.5" />
@@ -60,7 +50,7 @@ function DatasetUploadProcess({
         <div className="dataset-process-grid">
           {PROCESS_STEPS.map((step, index) => (
             <article
-              className={`dataset-step-item${index === 1 ? ' dataset-step-item-divider' : ''}${index === 2 ? ' dataset-step-item-wide' : ''}`}
+              className={`dataset-step-item${index === 1 ? ' dataset-step-item-divider' : ''}`}
               key={step.title}
             >
               <div className="dataset-step-icon">{step.icon}</div>

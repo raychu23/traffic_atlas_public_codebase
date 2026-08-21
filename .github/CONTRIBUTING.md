@@ -1,46 +1,51 @@
 # Contributing to Traffic Atlas
 
-First off, thank you for considering contributing to Traffic Atlas! It's people like you that make Traffic Atlas such a great tool.
+## Before starting
 
-## Code of Conduct
+1. Open or reference an issue for material behavior changes.
+2. Create a focused branch from `main`.
+3. Keep credentials, private keys, uploaded data, and generated artifacts out of Git.
 
-By participating in this project, you are expected to uphold our Code of Conduct.
+## Development workflow
 
-## How Can I Contribute?
+Install both dependency trees:
 
-### Reporting Bugs
+```bash
+npm run install-all
+```
 
-This section guides you through submitting a bug report for Traffic Atlas. Following these guidelines helps maintainers and the community understand your report, reproduce the behavior, and find related reports.
+Make the smallest coherent change and add tests at the lowest level that proves the behavior. Use
+browser tests for user workflows, integration tests for module boundaries, and unit tests for
+isolated logic.
 
-- **Use a clear and descriptive title** for the issue to identify the problem.
-- **Describe the exact steps which reproduce the problem** in as many details as possible.
-- **Provide specific examples to demonstrate the steps**. Include links to files or copy-pasteable snippets, which you use in those steps.
+Before opening a pull request, run:
 
-### Suggesting Enhancements
+```bash
+npm run format
+npm run verify
+npm run test:e2e
+```
 
-This section guides you through submitting an enhancement suggestion for Traffic Atlas, including completely new features and minor improvements to existing functionality.
+## Pull requests
 
-- **Use a clear and descriptive title** for the issue to identify the suggestion.
-- **Provide a step-by-step description of the suggested enhancement** in as many details as possible.
-- **Describe the current behavior and explain which behavior you expected to see instead** and why.
+- Explain the user-visible behavior and important implementation decisions.
+- List the checks you ran and any test or environment limitation.
+- Include screenshots for visible interface changes.
+- Keep unrelated refactors and formatting out of the pull request.
+- Do not merge with failing or skipped required checks.
 
-### Pull Requests
+## JavaScript conventions
 
-- Fill in the required template.
-- Do not include any sensitive information (API keys, credentials).
-- Ensure the test suite passes.
-- Provide a clear description of the changes.
+- Use two spaces for indentation.
+- Use camel case for variables and functions and Pascal case for React components.
+- Prefer small functions with explicit inputs and observable results.
+- Validate input at API and process boundaries.
+- Return stable, user-safe error messages; keep operational details in server logs.
+- Comment decisions or constraints that are not evident from the code. Do not narrate the code.
 
-## Styleguides
+ESLint and Prettier are the source of truth for mechanically enforceable style rules.
 
-### Git Commit Messages
+## Commit messages
 
-- Use the present tense ("Add feature" not "Added feature")
-- Use the imperative mood ("Move cursor to..." not "Moves cursor to...")
-- Limit the first line to 72 characters or less
-
-### JavaScript Styleguide
-
-- Use 2 spaces for indentation.
-- Use camelCase for variables and functions.
-- Use PascalCase for React components.
+Use an imperative summary no longer than 72 characters. Add a body when the reason or migration
+impact is not obvious from the diff.

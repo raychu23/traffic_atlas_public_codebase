@@ -1,6 +1,6 @@
 const fs = require('fs').promises;
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const {
   validateUploadRequestSchema,
   formatAjvErrors
@@ -198,7 +198,7 @@ async function resolveDatasetDir(datasetId, createIfMissing = false) {
 
 // User Operations
 async function createUser(userData) {
-  const userId = uuidv4();
+  const userId = crypto.randomUUID();
   const userDir = path.join(DATA_ROOT, 'users', `user_${userId}`);
   await ensureDir(userDir);
   
@@ -349,7 +349,7 @@ function toSnakeCase(obj) {
 }
 
 async function createDataset(datasetData) {
-  const datasetId = uuidv4();
+  const datasetId = crypto.randomUUID();
   const datasetDir = await resolveDatasetDir(datasetId, true);
   await ensureDir(datasetDir);
   
@@ -503,7 +503,7 @@ async function searchDatasets(filters = {}) {
 
 // Upload Request Operations
 async function createUploadRequest(userId, requestData) {
-  const requestId = requestData.requestId || uuidv4();
+  const requestId = requestData.requestId || crypto.randomUUID();
   const requestPath = path.join(
     DATA_ROOT,
     'requests',
@@ -542,7 +542,7 @@ async function saveUploadRequest(requestId, requestData) {
 
 // Download Request Operations
 async function createDownloadRequest(userId, datasetId, requestData) {
-  const requestId = uuidv4();
+  const requestId = crypto.randomUUID();
   const requestPath = path.join(
     DATA_ROOT,
     'requests',
@@ -608,7 +608,7 @@ async function getAdminQueue(queueType) {
 
 // Audit Operations
 async function logAuditEvent(eventType, eventData) {
-  const eventId = uuidv4();
+  const eventId = crypto.randomUUID();
   const eventPath = path.join(
     DATA_ROOT,
     'audit',
@@ -629,7 +629,7 @@ async function logAuditEvent(eventType, eventData) {
 
 // Consent Operations
 async function saveConsent(userId, consentData) {
-  const consentId = uuidv4();
+  const consentId = crypto.randomUUID();
   const consentPath = path.join(
     DATA_ROOT,
     'users',
@@ -948,7 +948,7 @@ async function validateUploadRequest(metadata, filePath) {
 
 // Review Operations
 async function createReview(requestType, requestId, reviewData) {
-  const reviewId = uuidv4();
+  const reviewId = crypto.randomUUID();
   const reviewPath = path.join(
     DATA_ROOT,
     'requests',

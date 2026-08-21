@@ -1,118 +1,142 @@
-# Traffic Atlas - Installation Guide
+# Installation
 
 ## Prerequisites
 
-- Node.js 16+ and npm
-- AWS Account with S3 access
-- AWS CLI configured (for S3 operations)
+- Node.js 20 or later
+- npm
+- `ffmpeg` and `ffprobe`
+- AWS credentials for the services enabled in the target environment
+- An OpenAI project API key for traffic-scene validation
 
-## Quick Start
+Video analytics also requires either the local YOLO processing tools or a provisioned DeepStream GPU
+worker.
+
+## Install dependencies
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd traffic-atlas
-
-# Install all dependencies (backend + frontend)
+git clone https://github.com/reactor-lab-admin/traffic_atlas_public_codebase.git
+cd traffic_atlas_public_codebase
 npm run install-all
+```
 
-# Configure environment variables
+The root package contains the Express API and development tooling. `frontend/` has a separate
+lockfile and dependency tree for the React application.
+
+## Configure the backend
+
+```bash
 cp .env.example .env
-# Edit .env with your AWS credentials and configuration
+```
 
-# Start development servers
+Set the Cognito, storage, OpenAI, and processing values required by the environment. Keep `.env`
+untracked.
+
+Important settings:
+
+| Variable                     | Purpose                                                     |
+| ---------------------------- | ----------------------------------------------------------- |
+| `COGNITO_USER_POOL_ID`       | Cognito pool used to verify access tokens                   |
+| `STORAGE_BACKEND`            | `s3` for shared storage or the supported local storage mode |
+| `OPENAI_API_KEY`             | Backend-only traffic-scene validation credential            |
+| `OPENAI_TRAFFIC_SCENE_MODEL` | Vision-capable model available to the OpenAI project        |
+| `MAX_VIDEO_UPLOAD_BYTES`     | Maximum video upload size before the request is rejected    |
+| `TRAFFIC_PROCESSOR_MODE`     | `local-yolo` or `deepstream-ssh`                            |
+
+Each developer should use a separate credential associated with the Traffic Atlas OpenAI project.
+Deployment credentials belong in the hosting platform's secret manager.
+
+### Local authentication
+
+Local authentication is disabled by default. To use the fixed local development identity, set:
+
+```dotenv
+DEV_AUTH_ENABLED=true
+```
+
+Do not enable this setting in a shared environment.
+
+## Configure the frontend
+
+```bash
+cp frontend/.env.example frontend/.env.local
+```
+
+For a local API and local authentication:
+
+```dotenv
+REACT_APP_API_URL=http://localhost:5001/api
+REACT_APP_DEV_AUTH_ENABLED=true
+```
+
+The frontend and backend development-auth flags must agree.
+
+## Configure video tooling
+
+Verify the binaries are available:
+
+```bash
+ffmpeg -version
+ffprobe -version
+```
+
+Set `FFMPEG_PATH` and `FFPROBE_PATH` only when the binaries are not on `PATH`.
+
+For `local-yolo`, configure `TRAFFIC_PROCESSOR_ROOT` and `TRAFFIC_PROCESSOR_PYTHON` if the sibling
+`traffic-tool` checkout and its `.venv` are not available. For `deepstream-ssh`, configure the
+remote host, SSH key, root directory, and container image shown in `.env.example`.
+
+## Run locally
+
+```bash
 npm run dev
 ```
 
-## Manual Installation
+- Frontend: `http://localhost:3000`
+- API: `http://localhost:5001/api`
 
-### Backend Dependencies
-
-```bash
-cd backend
-npm install
-```
-
-### Frontend Dependencies
+## Verify the checkout
 
 ```bash
-cd frontend
-npm install
+npm run format:check
+npm run verify
+npm run test:e2e
 ```
 
-## Environment Configuration
-
-Copy `.env.example` to `.env` and configure:
+Playwright requires a Chromium browser. Install it once when it is not already available:
 
 ```bash
-# Server
-PORT=5001
-
-# AWS Cognito (User Authentication)
-COGNITO_USER_POOL_ID=your-pool-id
-COGNITO_CLIENT_ID=your-client-id
-COGNITO_REGION=us-east-1
-COGNITO_ACCESS_KEY_ID=your-cognito-key
-COGNITO_SECRET_ACCESS_KEY=your-cognito-secret
-
-# Admin Configuration
-ADMIN_EMAILS=admin@example.com
-
-# AWS/S3 Storage Configuration
-STORAGE_BACKEND=s3
-AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=your-s3-key
-AWS_SECRET_ACCESS_KEY=your-s3-secret
-S3_BUCKET=your-bucket-name
-S3_PREFIX=traffic-atlas/repo
-S3_ENDPOINT=https://your-s3-endpoint
-S3_FORCE_PATH_STYLE=true
+npx playwright install chromium
 ```
 
-### S3 CORS for browser uploads/downloads
+## S3 CORS
 
-If the frontend uploads to or downloads from S3 directly in the browser, your bucket must allow CORS for your frontend origin and expose download headers needed for progress UI.
-
-A working example is provided at `backend/scripts/s3-cors-example.json`.
-Make sure your bucket CORS exposes at least:
+Browser-based S3 uploads and downloads require the frontend origin in the bucket's CORS policy.
+Expose at least these response headers:
 
 - `ETag`
 - `Content-Length`
 - `Content-Disposition`
 - `Content-Type`
 
-This is required so the browser can read file metadata and compute download progress for presigned S3 downloads.
+See `backend/scripts/s3-cors-example.json` for an example policy.
 
-## Development
-
-```bash
-# Start both backend and frontend
-npm run dev
-
-# Start backend only
-npm run server
-
-# Start frontend only
-npm run client
-```
-
-## Production Build
+## Production frontend build
 
 ```bash
-# Build frontend for production
-cd frontend
-npm run build
-
-# Backend is Node.js - no build required
-# Just ensure production dependencies are installed
-cd backend
-npm install --production
+npm ci
+npm ci --prefix frontend
+npm run build:frontend
 ```
+
+The generated frontend is written to `frontend/build/`. The backend runs directly on Node.js and
+must receive its secrets through the deployment environment.
 
 ## Troubleshooting
 
-- **Port conflicts**: Kill processes on ports 3000 and 5001
-- **AWS credentials**: Ensure IAM permissions include S3, Cognito, and SES access
-- **CORS issues**: Verify frontend API URL matches backend CORS settings
-
-For detailed deployment instructions, see [README.md](../README.md).
+- Authentication returns `503`: configure Cognito or enable both local development-auth flags.
+- Video validation returns `400`: confirm `ffmpeg` and `ffprobe` can read the uploaded codec.
+- Video validation returns `503`: check the backend OpenAI credential, model access, and server
+  logs.
+- Browser requests fail: verify `REACT_APP_API_URL`, API CORS origins, and the frontend deployment
+  CSP.
+- S3 uploads fail: verify IAM permissions, bucket CORS, bucket name, region, and optional prefix.

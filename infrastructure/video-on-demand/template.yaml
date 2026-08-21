@@ -1,0 +1,293 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: TrafficAtlas event-driven, start-on-demand GPU video processing
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: production
+    AllowedPattern: '[a-z0-9-]+'
+  GpuInstanceId:
+    Type: AWS::EC2::Instance::Id
+    Description: Existing EBS-backed GPU EC2 worker
+  JobRetentionDays:
+    Type: Number
+    Default: 30
+    MinValue: 1
+    MaxValue: 365
+
+Resources:
+  VideoArtifactsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireVideoInputsAndOutputs
+            Status: Enabled
+            Prefix: traffic-video-jobs/
+            ExpirationInDays: !Ref JobRetentionDays
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 7
+      Tags:
+        - Key: Application
+          Value: TrafficAtlas
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  VideoJobsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: videoId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: videoId
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      Tags:
+        - Key: Application
+          Value: TrafficAtlas
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  VideoJobsDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      FifoQueue: true
+      ContentBasedDeduplication: true
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+      QueueName: !Sub 'traffic-atlas-video-dlq-${EnvironmentName}.fifo'
+
+  VideoJobsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      FifoQueue: true
+      ContentBasedDeduplication: false
+      MessageRetentionPeriod: 345600
+      VisibilityTimeout: 21600
+      SqsManagedSseEnabled: true
+      QueueName: !Sub 'traffic-atlas-video-jobs-${EnvironmentName}.fifo'
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt VideoJobsDeadLetterQueue.Arn
+        maxReceiveCount: 3
+
+  GpuWorkerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: TrafficVideoWorker
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:AbortMultipartUpload
+                Resource:
+                  - !Sub '${VideoArtifactsBucket.Arn}/traffic-video-jobs/*'
+                  - !Sub '${VideoArtifactsBucket.Arn}/bootstrap/*'
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:ChangeMessageVisibility
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt VideoJobsQueue.Arn
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                Resource: !GetAtt VideoJobsTable.Arn
+              - Effect: Allow
+                Action: ec2:StopInstances
+                Resource: !Sub 'arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${GpuInstanceId}'
+
+  BackendVideoOrchestrationPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: TrafficAtlas API access to enqueue and read video jobs
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+            Resource: !Sub '${VideoArtifactsBucket.Arn}/traffic-video-jobs/*'
+          - Effect: Allow
+            Action: sqs:SendMessage
+            Resource: !GetAtt VideoJobsQueue.Arn
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:UpdateItem
+            Resource: !GetAtt VideoJobsTable.Arn
+
+  GpuWorkerInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref GpuWorkerRole
+
+  ControllerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: StartGpuForQueuedJobs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:DescribeInstances
+                  - ec2:DescribeInstanceStatus
+                Resource: '*'
+              - Effect: Allow
+                Action: ec2:StartInstances
+                Resource: !Sub 'arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${GpuInstanceId}'
+              - Effect: Allow
+                Action: sqs:GetQueueAttributes
+                Resource: !GetAtt VideoJobsQueue.Arn
+
+  WorkerController:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'traffic-atlas-video-controller-${EnvironmentName}'
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt ControllerRole.Arn
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          GPU_INSTANCE_ID: !Ref GpuInstanceId
+          VIDEO_QUEUE_URL: !Ref VideoJobsQueue
+      Code:
+        ZipFile: |
+          import os
+          import boto3
+
+          ec2 = boto3.client("ec2")
+          sqs = boto3.client("sqs")
+          instance_id = os.environ["GPU_INSTANCE_ID"]
+          queue_url = os.environ["VIDEO_QUEUE_URL"]
+
+          def handler(event, context):
+              attributes = sqs.get_queue_attributes(
+                  QueueUrl=queue_url,
+                  AttributeNames=[
+                      "ApproximateNumberOfMessages",
+                      "ApproximateNumberOfMessagesNotVisible",
+                  ],
+              )["Attributes"]
+              queued = int(attributes.get("ApproximateNumberOfMessages", "0"))
+              in_flight = int(
+                  attributes.get("ApproximateNumberOfMessagesNotVisible", "0")
+              )
+              response = ec2.describe_instances(InstanceIds=[instance_id])
+              state = response["Reservations"][0]["Instances"][0]["State"]["Name"]
+              started = False
+              if queued > 0 and state == "stopped":
+                  ec2.start_instances(InstanceIds=[instance_id])
+                  started = True
+              return {
+                  "instanceId": instance_id,
+                  "state": state,
+                  "queued": queued,
+                  "inFlight": in_flight,
+                  "started": started,
+              }
+
+  ControllerSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Start the TrafficAtlas GPU worker whenever video work is queued
+      ScheduleExpression: rate(1 minute)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt WorkerController.Arn
+          Id: VideoWorkerController
+
+  ControllerSchedulePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WorkerController
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt ControllerSchedule.Arn
+
+  DeadLetterAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: TrafficAtlas video jobs exhausted retries
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt VideoJobsDeadLetterQueue.QueueName
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+Outputs:
+  VideoBucket:
+    Value: !Ref VideoArtifactsBucket
+  VideoQueueUrl:
+    Value: !Ref VideoJobsQueue
+  VideoQueueArn:
+    Value: !GetAtt VideoJobsQueue.Arn
+  VideoJobsTable:
+    Value: !Ref VideoJobsTable
+  WorkerControllerName:
+    Value: !Ref WorkerController
+  GpuInstanceId:
+    Value: !Ref GpuInstanceId
+  BackendPolicyArn:
+    Value: !Ref BackendVideoOrchestrationPolicy
+  GpuWorkerInstanceProfileName:
+    Value: !Ref GpuWorkerInstanceProfile

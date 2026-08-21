@@ -66,5 +66,10 @@ describe('UploadLanding upload path chooser', () => {
     });
 
     expect(container.textContent).not.toContain('Submit a dataset');
+    expect(container.textContent).not.toContain('Upload Data');
+    expect(container.textContent).not.toContain('already supported');
+    expect(container.textContent).toContain(
+      'vehicle tracking, trajectory mapping, and movement counts',
+    );
   });
 });

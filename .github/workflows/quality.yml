@@ -1,0 +1,41 @@
+name: Quality checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      QUALITY_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+      - name: Install backend and quality dependencies
+        run: npm ci
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+      - name: Verify source, tests, and production build
+        run: npm run verify
+      - name: Audit backend production dependencies
+        run: npm run audit:backend
+      - name: Audit frontend production dependencies
+        run: npm run audit:frontend
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run browser workflow tests
+        run: npm run test:e2e

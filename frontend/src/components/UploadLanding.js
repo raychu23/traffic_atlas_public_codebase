@@ -31,9 +31,6 @@ function UploadLanding() {
       <section className="upload-hero-wrap">
         <div className="upload-hero-copy">
           <h1>Input the who, what, when, where, and your data will be live after approval!</h1>
-          <button className="upload-pill-btn" onClick={handleUpload}>
-            Upload Data
-          </button>
         </div>
 
         <div className="upload-hero-media">
@@ -55,8 +52,9 @@ function UploadLanding() {
           <span className="eyebrow">Choose upload type</span>
           <h2 id="upload-choice-title">What are you uploading?</h2>
           <p>
-            Dataset upload is already supported. Use Video upload when you want to submit raw
-            traffic footage for video-specific checks and processing.
+            Dataset upload lets you submit a representative ZIP, document ownership and collection
+            details, and send it for review. Video upload accepts raw traffic footage for automated
+            validation, vehicle tracking, trajectory mapping, and movement counts.
           </p>
         </div>
 

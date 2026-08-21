@@ -30,8 +30,17 @@ function polygonPoints(points) {
   return points.map((point) => `${point.x},${point.y}`).join(' ');
 }
 
+function zoneCenter(zone) {
+  return {
+    x: zone.points.reduce((sum, point) => sum + point.x, 0) / zone.points.length,
+    y: zone.points.reduce((sum, point) => sum + point.y, 0) / zone.points.length,
+  };
+}
+
 function processingMessage(job) {
   if (!job) return 'Loading video job…';
+  if (job.status === 'queued' && job.processingMode === 's3-lambda-ec2')
+    return 'Queued in S3 · awaiting the on-demand GPU worker';
   if (job.status === 'queued') return 'Queued for DeepStream GPU tracking';
   if (job.status === 'processing')
     return 'Mapping vehicle trajectories on the DeepStream EC2 worker…';
@@ -410,7 +419,6 @@ function UploadVideoDetails() {
                     points={polygonPoints(zone.points)}
                     fill={zone.color}
                     stroke={zone.color}
-                    strokeWidth="0.8"
                   />
                 ))}
                 {(job?.trajectories || []).map((trajectory) => (
@@ -453,27 +461,46 @@ function UploadVideoDetails() {
                 })}
                 {zones.map((zone) => (
                   <g key={`zone-controls-${zone.id}`} className="zone-controls">
+                    <rect
+                      className="zone-label-badge"
+                      x={zoneCenter(zone).x - 7.5}
+                      y={zoneCenter(zone).y - 2.6}
+                      width="15"
+                      height="5.2"
+                      rx="1.4"
+                      fill={zone.color}
+                    />
                     <text
-                      x={zone.points.reduce((sum, point) => sum + point.x, 0) / zone.points.length}
-                      y={zone.points.reduce((sum, point) => sum + point.y, 0) / zone.points.length}
+                      className="zone-label-text"
+                      x={zoneCenter(zone).x}
+                      y={zoneCenter(zone).y}
                       textAnchor="middle"
                       dominantBaseline="middle"
                     >
                       {zone.label}
                     </text>
                     {zone.points.map((point, index) => (
-                      <circle
-                        key={`${zone.id}-${index}`}
-                        cx={point.x}
-                        cy={point.y}
-                        r="1.8"
-                        onPointerDown={(event) => {
-                          if (savingZones) return;
-                          event.preventDefault();
-                          event.currentTarget.setPointerCapture(event.pointerId);
-                          setDragTarget({ zoneId: zone.id, pointIndex: index });
-                        }}
-                      />
+                      <g key={`${zone.id}-${index}`} className="zone-handle-group">
+                        <circle
+                          className="zone-handle-hit"
+                          cx={point.x}
+                          cy={point.y}
+                          r="2.1"
+                          onPointerDown={(event) => {
+                            if (savingZones) return;
+                            event.preventDefault();
+                            event.currentTarget.setPointerCapture(event.pointerId);
+                            setDragTarget({ zoneId: zone.id, pointIndex: index });
+                          }}
+                        />
+                        <circle
+                          className="zone-handle"
+                          cx={point.x}
+                          cy={point.y}
+                          r="0.62"
+                          fill={zone.color}
+                        />
+                      </g>
                     ))}
                   </g>
                 ))}

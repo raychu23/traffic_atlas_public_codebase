@@ -1,4 +1,4 @@
-# Traffic Atlas - API Documentation
+# API reference
 
 ## Base URL
 
@@ -8,7 +8,8 @@ http://localhost:5001/api
 
 ## Authentication
 
-All API endpoints (except `/api/auth/login`) require a valid JWT token in the `Authorization` header:
+Protected endpoints require a valid Cognito JWT for the configured application client in the
+`Authorization` header:
 
 ```
 Authorization: Bearer <your-jwt-token>
@@ -19,9 +20,11 @@ Authorization: Bearer <your-jwt-token>
 ### Authentication
 
 #### POST /api/users/login
+
 Login user and return JWT token.
 
 **Request:**
+
 ```json
 {
   "email": "user@example.com",
@@ -30,6 +33,7 @@ Login user and return JWT token.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -42,11 +46,13 @@ Login user and return JWT token.
 ```
 
 #### GET /api/auth/me
+
 Get current user profile.
 
 **Headers:** `Authorization: Bearer <token>`
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -60,9 +66,11 @@ Get current user profile.
 ### Datasets
 
 #### GET /api/datasets
+
 List all available datasets.
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -79,9 +87,11 @@ List all available datasets.
 ```
 
 #### GET /api/datasets/:id
+
 Get dataset details by ID.
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -95,15 +105,18 @@ Get dataset details by ID.
 ```
 
 #### POST /api/datasets/upload-request
+
 Submit new dataset upload request.
 
 **Headers:** `Authorization: Bearer <token>`, `Content-Type: multipart/form-data`
 
 **Request:**
+
 - Form fields for dataset metadata
 - File: `sampleFile` (ZIP file, max 1GB)
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -112,11 +125,13 @@ Submit new dataset upload request.
 ```
 
 #### POST /api/datasets/:id/download
+
 Request dataset download.
 
 **Headers:** `Authorization: Bearer <token>`
 
 **Request:**
+
 ```json
 {
   "downloaderMetadata": {...},
@@ -124,14 +139,64 @@ Request dataset download.
 }
 ```
 
+### Traffic Video Processing
+
+All video endpoints require `Authorization: Bearer <token>` and are owner-scoped.
+
+#### POST /api/videos/validate-upload
+
+Upload a traffic video in multipart field `videoFile`. The backend enforces the configured upload
+limit, validates metadata and sampled frames, stores accepted video, creates a persistent job,
+extracts a preview frame, and starts the configured worker asynchronously.
+
+#### GET /api/videos/:videoId
+
+Return processing status, sampled trajectory paths, saved normalized zones, movement-count rows,
+artifact availability, and any worker error. Poll while `status` is `queued` or `processing`, or
+while `countsStatus` is `calculating`.
+
+#### POST /api/videos/:videoId/process
+
+Start or retry tracking for an owned video job. Returns HTTP `202`.
+
+#### PUT /api/videos/:videoId/zones
+
+Save one to twenty editable zones and recalculate movement counts without rerunning tracking.
+Coordinates are normalized percentages (`0`–`100`) and are persisted to pixel-coordinate
+`zones.geojson` using the source video dimensions.
+
+```json
+{
+  "zones": [
+    {
+      "id": "west-entry",
+      "label": "West entry",
+      "color": "#00847c",
+      "points": [
+        { "x": 2, "y": 20 },
+        { "x": 35, "y": 20 },
+        { "x": 35, "y": 80 }
+      ]
+    }
+  ]
+}
+```
+
+#### GET /api/videos/:videoId/artifacts/:artifact
+
+Download an owned artifact. Supported artifact names are `preview`, `tracks`, `counts`, and
+`annotated`.
+
 ### User Dashboard
 
 #### GET /api/users/me/dashboard
+
 Get user's dashboard data (uploads, downloads).
 
 **Headers:** `Authorization: Bearer <token>`
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -145,44 +210,57 @@ Get user's dashboard data (uploads, downloads).
 All admin endpoints require admin privileges.
 
 #### GET /api/admin/users
+
 List all users.
 
 #### GET /api/admin/upload-requests
+
 List all upload requests.
 
 #### GET /api/admin/upload-requests/:requestId
+
 Get details of a specific upload request.
 
 #### POST /api/admin/upload-requests/:requestId/approve
+
 Approve upload request.
 
 #### POST /api/admin/upload-requests/:requestId/reject
+
 Reject upload request.
 
 #### POST /api/admin/upload-requests/:requestId/comment
+
 Send a comment/clarification to the uploader.
 
 #### GET /api/admin/download-requests
+
 List all download requests.
 
 #### GET /api/admin/download-requests/:requestId
+
 Get details of a specific download request.
 
 #### POST /api/admin/download-requests/:requestId/approve
+
 Approve download request.
 
 #### POST /api/admin/download-requests/:requestId/reject
+
 Reject download request.
 
 #### POST /api/admin/download-requests/:requestId/comment
+
 Send a comment/clarification to the requester.
 
 ### Messaging
 
 #### GET /api/requests/:type/:requestId/messages
+
 Get chat messages for a request (upload or download).
 
 #### POST /api/requests/:type/:requestId/messages
+
 Post a new message to the request chat.
 
 ## Error Responses
@@ -197,11 +275,13 @@ All endpoints return consistent error format:
 ```
 
 **Status Codes:**
+
 - `200` - Success
 - `400` - Bad Request
 - `401` - Unauthorized
 - `403` - Forbidden
 - `404` - Not Found
+- `422` - Uploaded video is not accepted traffic-camera footage
 - `500` - Server Error
 
 ## Rate Limiting

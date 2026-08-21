@@ -418,7 +418,10 @@
 }
 
 .zone-editor .zone-fill {
-  opacity: 0.34;
+  fill-opacity: 0.22;
+  stroke-width: 2px;
+  stroke-opacity: 0.95;
+  stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
 }
 
@@ -449,25 +452,41 @@
   fill: #ef4444;
 }
 
-.zone-editor text {
-  fill: #ffffff;
-  font-size: 3.2px;
-  font-weight: 800;
-  paint-order: stroke;
-  stroke: rgba(0, 0, 0, 0.45);
-  stroke-width: 0.45px;
+.zone-editor .zone-label-badge {
+  fill-opacity: 0.94;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 0.8px;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.48));
   pointer-events: none;
-}
-
-.zone-editor circle {
-  fill: #ffffff;
-  stroke: #121212;
-  stroke-width: 0.45;
-  cursor: grab;
   vector-effect: non-scaling-stroke;
 }
 
-.zone-editor circle:active {
+.zone-editor .zone-label-text {
+  fill: #ffffff;
+  font-size: 2.75px;
+  font-weight: 850;
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, 0.28);
+  stroke-width: 0.3px;
+  pointer-events: none;
+}
+
+.zone-editor .zone-handle-hit {
+  fill: transparent;
+  stroke: none;
+  cursor: grab;
+  pointer-events: all;
+}
+
+.zone-editor .zone-handle {
+  stroke: #ffffff;
+  stroke-width: 1.2px;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.8));
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.zone-editor .zone-handle-hit:active {
   cursor: grabbing;
 }
 

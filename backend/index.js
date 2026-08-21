@@ -15,6 +15,16 @@ const emailService = require("./email");
 const stepFunctions = require("./stepFunctions");
 const embeddingsSphericalPca = require("./embeddingsSphericalPca");
 const datasetFilterTags = require("./datasetFilterTags");
+const {
+  validateTrafficVideo,
+} = require("./videoValidation/validateTrafficVideo");
+const { extractVideoFrames } = require("./videoValidation/frameExtractor");
+const { verifyVideoTooling } = require("./videoValidation/tooling");
+const {
+  getVideoUploadErrorResponse,
+} = require("./videoValidation/uploadErrors");
+const videoJobs = require("./videoJobs");
+const { getVideoDataPaths } = require("./videoDataPaths");
 const crypto = require("crypto");
 
 const app = express();
@@ -70,26 +80,48 @@ app.use(
   express.static(path.join(__dirname, "..", "frontend", "public", "legal")),
 );
 
+app.get("/api/health", (req, res) => {
+  res.json({
+    success: true,
+    service: "traffic-atlas-api",
+    uptimeSeconds: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
+const { sourcesRoot: acceptedVideosDir, stagingRoot: videoStagingDir } =
+  getVideoDataPaths(process.env, __dirname);
+for (const directory of [acceptedVideosDir, videoStagingDir]) {
+  if (!fs.existsSync(directory)) {
+    fs.mkdirSync(directory, { recursive: true });
+  }
+}
 
 async function clearTempUploadsOnStartup() {
-  try {
-    const entries = await fsPromises.readdir(uploadsDir, {
-      withFileTypes: true,
-    });
-    await Promise.all(
-      entries
-        .filter((entry) => entry.isFile())
-        .map((entry) =>
-          fsPromises.unlink(path.join(uploadsDir, entry.name)).catch(() => {}),
-        ),
-    );
-  } catch (error) {
-    console.warn("Unable to clear temp uploads directory:", error.message);
+  const stagingDirectories = new Set([uploadsDir, videoStagingDir]);
+  for (const directory of stagingDirectories) {
+    try {
+      const entries = await fsPromises.readdir(directory, {
+        withFileTypes: true,
+      });
+      await Promise.all(
+        entries
+          .filter((entry) => entry.isFile())
+          .map((entry) =>
+            fsPromises.unlink(path.join(directory, entry.name)).catch(() => {}),
+          ),
+      );
+    } catch (error) {
+      console.warn(
+        `Unable to clear temp uploads directory ${directory}:`,
+        error.message,
+      );
+    }
   }
 }
 
@@ -151,6 +183,40 @@ const fullUpload = multer({
   storage: uploadStorage,
 });
 
+const DEFAULT_MAX_VIDEO_UPLOAD_BYTES = 10 * 1024 * 1024 * 1024;
+const configuredVideoUploadBytes = Number(
+  process.env.MAX_VIDEO_UPLOAD_BYTES || DEFAULT_MAX_VIDEO_UPLOAD_BYTES,
+);
+if (
+  !Number.isSafeInteger(configuredVideoUploadBytes) ||
+  configuredVideoUploadBytes <= 0
+) {
+  throw new Error("MAX_VIDEO_UPLOAD_BYTES must be a positive integer");
+}
+const MAX_VIDEO_UPLOAD_BYTES = configuredVideoUploadBytes;
+
+const videoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, videoStagingDir),
+    filename: (req, file, cb) => {
+      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+      cb(null, `video-${uniqueSuffix}${path.extname(file.originalname)}`);
+    },
+  }),
+  limits: { fileSize: MAX_VIDEO_UPLOAD_BYTES },
+  fileFilter: (req, file, callback) => {
+    if (!isSupportedTrafficVideoFile(file.originalname)) {
+      const error = new Error(
+        "Unsupported video format. Upload MP4, MOV, AVI, MKV, WebM, or WMV.",
+      );
+      error.statusCode = 400;
+      callback(error);
+      return;
+    }
+    callback(null, true);
+  },
+});
+
 const withUploadLimit = (bytes) => (req, res, next) => {
   req.uploadLimitBytes = bytes;
   next();
@@ -206,6 +272,14 @@ function slugifyFilenamePart(value, fallback = "dataset") {
 function buildDatasetDownloadName(dataset, { isSample = false } = {}) {
   const safeTitle = slugifyFilenamePart(dataset?.title);
   return `${safeTitle}${isSample ? "-sample" : ""}.zip`;
+}
+
+function isSupportedTrafficVideoFile(fileName) {
+  const extension = path
+    .extname(String(fileName || ""))
+    .toLowerCase()
+    .replace(".", "");
+  return ["mp4", "mov", "avi", "mkv", "webm", "wmv"].includes(extension);
 }
 
 function hasValidBootstrapToken(req) {
@@ -1181,6 +1255,196 @@ app.post(
   },
 );
 
+app.post(
+  "/api/videos/validate-upload",
+  requireAuth,
+  withUploadLimit(MAX_VIDEO_UPLOAD_BYTES),
+  videoUpload.single("videoFile"),
+  async (req, res) => {
+    let tempFilePath = null;
+    let storedFilePath = null;
+    let videoId = null;
+    let uploadCommitted = false;
+    try {
+      const userId = req.auth.userId;
+      tempFilePath = req.file?.path || null;
+
+      if (!req.file) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Video file is required" });
+      }
+
+      const validation = await validateTrafficVideo(tempFilePath);
+      videoId = crypto.randomUUID();
+      const extension =
+        path.extname(req.file.originalname).toLowerCase() || ".mp4";
+      const storedFileName = `${videoId}${extension}`;
+      const storedPath = path.join(acceptedVideosDir, storedFileName);
+      await fsPromises.rename(tempFilePath, storedPath);
+      storedFilePath = storedPath;
+      tempFilePath = null;
+
+      await videoJobs.createVideoJob({
+        videoId,
+        userId,
+        sourceVideoPath: storedPath,
+        fileName: req.file.originalname,
+        fileSize: req.file.size,
+        contentType: req.file.mimetype,
+        durationSeconds: validation.durationSeconds,
+        width: validation.width,
+        height: validation.height,
+        sampledFrameCount: validation.sampledFrameCount,
+        trafficScene: validation.trafficScene,
+      });
+
+      const previewTimestamp = Math.min(
+        1,
+        Math.max(0.1, validation.durationSeconds / 2),
+      );
+      const preview = await extractVideoFrames(storedPath, [previewTimestamp]);
+      try {
+        await videoJobs.savePreview(videoId, preview.framePaths[0]);
+      } finally {
+        await fsPromises.rm(preview.frameDir, { recursive: true, force: true });
+      }
+
+      await dataStorage.logAuditEvent("upload", {
+        videoId,
+        userId,
+        action: "traffic_video_upload_validated",
+        fileName: req.file.originalname,
+        fileSize: req.file.size,
+        durationSeconds: validation.durationSeconds,
+        sampledFrameCount: validation.sampledFrameCount,
+        trafficSceneConfidence: validation.trafficScene.confidence,
+      });
+
+      res.json({
+        success: true,
+        video: {
+          videoId,
+          fileName: req.file.originalname,
+          fileSize: req.file.size,
+          contentType: req.file.mimetype,
+          durationSeconds: validation.durationSeconds,
+          width: validation.width,
+          height: validation.height,
+          sampledFrameCount: validation.sampledFrameCount,
+          trafficScene: validation.trafficScene,
+          status: "queued",
+        },
+      });
+      uploadCommitted = true;
+
+      videoJobs.startVideoProcessing(videoId).catch((error) => {
+        console.error(
+          `Unable to start video processing for ${videoId}:`,
+          error,
+        );
+      });
+    } catch (error) {
+      console.error("Traffic video upload validation error:", error);
+      const response = getVideoUploadErrorResponse(error);
+      res.status(response.status).json({
+        success: false,
+        error: response.message,
+        trafficScene: response.trafficScene,
+      });
+    } finally {
+      await cleanupTempUpload(tempFilePath);
+      if (!uploadCommitted) {
+        if (videoId) {
+          try {
+            await videoJobs.removeVideoJob(videoId);
+          } catch (error) {
+            console.warn(
+              `Unable to remove incomplete video job ${videoId}:`,
+              error.message,
+            );
+          }
+        }
+        await cleanupTempUpload(storedFilePath);
+      }
+    }
+  },
+);
+
+app.get("/api/videos/:videoId", requireAuth, async (req, res) => {
+  try {
+    const job = await videoJobs.getPublicVideoJob(
+      req.params.videoId,
+      req.auth.userId,
+    );
+    res.json({ success: true, video: job });
+  } catch (error) {
+    res
+      .status(error.statusCode || 500)
+      .json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/videos/:videoId/process", requireAuth, async (req, res) => {
+  try {
+    const job = await videoJobs.getVideoJob(req.params.videoId);
+    videoJobs.assertJobOwner(job, req.auth.userId);
+    videoJobs.startVideoProcessing(req.params.videoId).catch((error) => {
+      console.error(
+        `Unable to restart video processing for ${req.params.videoId}:`,
+        error,
+      );
+    });
+    const publicJob = await videoJobs.getPublicVideoJob(
+      req.params.videoId,
+      req.auth.userId,
+    );
+    res.status(202).json({ success: true, video: publicJob });
+  } catch (error) {
+    res
+      .status(error.statusCode || 500)
+      .json({ success: false, error: error.message });
+  }
+});
+
+app.put("/api/videos/:videoId/zones", requireAuth, async (req, res) => {
+  try {
+    const job = await videoJobs.saveZones(
+      req.params.videoId,
+      req.auth.userId,
+      req.body?.zones,
+    );
+    res.json({ success: true, video: job });
+  } catch (error) {
+    res
+      .status(error.statusCode || 500)
+      .json({ success: false, error: error.message });
+  }
+});
+
+app.get(
+  "/api/videos/:videoId/artifacts/:artifact",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const artifactPath = await videoJobs.getArtifactPath(
+        req.params.videoId,
+        req.auth.userId,
+        req.params.artifact,
+      );
+      if (["tracks", "counts"].includes(req.params.artifact)) {
+        res.download(artifactPath);
+        return;
+      }
+      res.sendFile(artifactPath);
+    } catch (error) {
+      res
+        .status(error.statusCode || 500)
+        .json({ success: false, error: error.message });
+    }
+  },
+);
+
 // Multipart Upload (Sample Dataset)
 app.post(
   "/api/datasets/upload-request/multipart/initiate",
@@ -1620,6 +1884,7 @@ app.get(
   "/api/datasets/:datasetId/upload-full/multipart/parts",
   requireAuth,
   async (req, res) => {
+    const { datasetId } = req.params;
     try {
       if (!s3Storage.isEnabled()) {
         return res.status(400).json({
@@ -1627,7 +1892,6 @@ app.get(
           error: "S3 is not configured for multipart uploads.",
         });
       }
-      const { datasetId } = req.params;
       const dataset = await requireDatasetOwnerOrAdmin(req, res, datasetId);
       if (!dataset) return;
 
@@ -2047,16 +2311,17 @@ app.post("/api/datasets/:datasetId/download", requireAuth, async (req, res) => {
       action: "dataset_downloaded",
     });
 
-    let filePath = await dataStorage.getDatasetFile(req.params.datasetId, false);
+    let filePath = await dataStorage.getDatasetFile(
+      req.params.datasetId,
+      false,
+    );
     let isSample = false;
     if (!filePath) {
       filePath = await dataStorage.getDatasetFile(req.params.datasetId, true);
       isSample = true;
     }
     if (!filePath) {
-      return res
-        .status(404)
-        .json({ success: false, error: "File not found" });
+      return res.status(404).json({ success: false, error: "File not found" });
     }
 
     const downloadName = buildDatasetDownloadName(dataset, { isSample });
@@ -2108,7 +2373,9 @@ app.get(
         console.warn("sample-url audit log failed:", auditErr.message);
       }
 
-      const downloadName = buildDatasetDownloadName(dataset, { isSample: true });
+      const downloadName = buildDatasetDownloadName(dataset, {
+        isSample: true,
+      });
       const payload = await buildDownloadUrlPayload(
         datasetId,
         filePath,
@@ -2421,7 +2688,9 @@ app.get(
           filePath = await dataStorage.getDatasetFile(request.datasetId, true);
           const dataset = await dataStorage.getDataset(request.datasetId);
           if (dataset) {
-            downloadName = buildDatasetDownloadName(dataset, { isSample: true });
+            downloadName = buildDatasetDownloadName(dataset, {
+              isSample: true,
+            });
           }
         }
       }
@@ -3078,8 +3347,7 @@ app.get("/api/notifications", requireAuth, async (req, res) => {
 // Must be defined AFTER all routes (4-arg signature = error middleware in Express).
 // CORS headers are already set by the cors() middleware before this runs,
 // so the browser will NOT see a spurious CORS error even on 4xx/5xx responses.
-// eslint-disable-next-line no-unused-vars
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   // multer file-size limit exceeded
   if (err.code === "LIMIT_FILE_SIZE") {
     const limitLabel = formatUploadLimit(req.uploadLimitBytes);
@@ -3094,6 +3362,12 @@ app.use((err, req, res, next) => {
       .status(400)
       .json({ success: false, error: "Unexpected file field in upload." });
   }
+  if (err.statusCode && err.statusCode >= 400 && err.statusCode < 500) {
+    return res.status(err.statusCode).json({
+      success: false,
+      error: err.message,
+    });
+  }
   // Generic fallback
   console.error("Unhandled Express error:", err);
   return res
@@ -3104,6 +3378,40 @@ app.use((err, req, res, next) => {
 // Start server
 app.listen(PORT, () => {
   clearTempUploadsOnStartup();
+  videoJobs
+    .recoverInterruptedVideoJobs()
+    .then((recovered) => {
+      if (recovered > 0) {
+        console.warn(
+          `Marked ${recovered} interrupted video job(s) as failed so they can be retried.`,
+        );
+      }
+    })
+    .catch((error) => {
+      console.warn("Unable to recover interrupted video jobs:", error.message);
+    });
+  verifyVideoTooling()
+    .then((result) => {
+      if (result.ok) {
+        console.log(
+          "Video upload validation tooling available:",
+          result.versions,
+        );
+      } else {
+        console.warn(result.message);
+        result.missingTools.forEach((tool) => {
+          console.warn(
+            `Missing ${tool.name}: tried "${tool.command}". Set ${tool.envVar} if needed.`,
+          );
+        });
+      }
+    })
+    .catch((error) => {
+      console.warn(
+        "Unable to verify video upload validation tooling:",
+        error.message,
+      );
+    });
   console.log(`Server running on port ${PORT}`);
   console.log(`Storage structure initialized at: ${dataStorage.DATA_ROOT}`);
 });

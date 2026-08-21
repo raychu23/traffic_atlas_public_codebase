@@ -135,6 +135,10 @@ describe('UploadVideoDetails processing results', () => {
     expect(container.querySelectorAll('.trajectory-path')).toHaveLength(1);
     expect(container.querySelectorAll('.trajectory-start')).toHaveLength(1);
     expect(container.querySelectorAll('.trajectory-end')).toHaveLength(1);
+    expect(container.querySelectorAll('.zone-label-badge')).toHaveLength(2);
+    expect(container.querySelectorAll('.zone-handle')).toHaveLength(8);
+    expect(container.querySelectorAll('.zone-handle-hit')).toHaveLength(8);
+    expect(container.querySelector('.zone-handle').getAttribute('r')).toBe('0.62');
     const zoneFill = container.querySelector('.zone-fill');
     const trajectoryPath = container.querySelector('.trajectory-path');
     expect(
@@ -157,5 +161,26 @@ describe('UploadVideoDetails processing results', () => {
       expect.arrayContaining([expect.objectContaining({ id: 'zone-1' })]),
     );
     expect(container.textContent).toContain('3 total vehicles');
+  });
+
+  test('labels an S3 handoff as awaiting the on-demand worker', async () => {
+    getTrafficVideoJob.mockResolvedValue({
+      success: true,
+      video: {
+        ...baseVideo,
+        status: 'queued',
+        countsStatus: 'awaiting_tracks',
+        processingMode: 's3-lambda-ec2',
+      },
+    });
+    await act(async () => {
+      root.render(
+        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <UploadVideoDetails />
+        </MemoryRouter>,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(container.textContent).toContain('Queued in S3 · awaiting the on-demand GPU worker');
   });
 });
