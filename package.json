@@ -14,7 +14,13 @@
     "sync-s3": "node backend/scripts/sync-data-to-s3.js",
     "init-s3": "node backend/scripts/init-s3-structure.js",
     "discover-pipeline": "node backend/scripts/discover-pipeline-arn.js",
-    "start-pipeline": "node backend/scripts/start-pipeline.js"
+    "start-pipeline": "node backend/scripts/start-pipeline.js",
+    "test:backend": "node --test backend/*.test.js backend/**/*.test.js",
+    "test:frontend": "cd frontend && CI=true npm test -- --runInBand --watchAll=false",
+    "test:e2e": "playwright test",
+    "build:frontend": "cd frontend && npm run build",
+    "verify": "npm run test:backend && npm run test:frontend && npm run build:frontend",
+    "test:backend:video-validation": "node --test backend/videoValidation/*.test.js backend/videoJobs.test.js"
   },
   "keywords": [
     "traffic",
@@ -25,10 +31,15 @@
   "license": "MIT",
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1015.0",
+    "@aws-sdk/client-dynamodb": "^3.1094.0",
+    "@aws-sdk/client-ec2": "^3.1094.0",
     "@aws-sdk/client-s3": "^3.1005.0",
     "@aws-sdk/client-ses": "^3.1015.0",
     "@aws-sdk/client-sfn": "^3.1049.0",
+    "@aws-sdk/client-sqs": "^3.1094.0",
     "@aws-sdk/client-sts": "^3.1056.0",
+    "@aws-sdk/lib-storage": "^3.1015.0",
+    "@aws-sdk/lib-dynamodb": "^3.1094.0",
     "@aws-sdk/s3-request-presigner": "^3.1023.0",
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",
@@ -44,6 +55,7 @@
     "uuid": "^9.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "concurrently": "^8.2.2",
     "nodemon": "^3.0.1"
   }
