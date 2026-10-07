@@ -1,0 +1,15 @@
+[Unit]
+Description=TrafficAtlas S3-manifest GPU worker
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/traffic-atlas/s3-worker.env
+ExecStart=/opt/traffic-atlas-worker/venv/bin/python /opt/traffic-atlas-worker/traffic_s3_worker.py
+Restart=on-failure
+RestartSec=20
+
+[Install]
+WantedBy=multi-user.target
