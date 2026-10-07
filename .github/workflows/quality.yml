@@ -1,0 +1,40 @@
+name: Video upload checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+      - name: Install backend dependencies
+        run: npm ci
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+      - name: Verify tests and production build
+        run: npm run verify
+        env:
+          # Retain upstream build warnings without changing unrelated dataset code.
+          CI: 'false'
+      - name: Test S3 worker orchestration
+        run: python3 -m unittest discover -s infrastructure/minimal-on-demand -p 'test_*.py'
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run browser workflow tests
+        run: npm run test:e2e
