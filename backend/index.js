@@ -16,6 +16,7 @@ const stepFunctions = require("./stepFunctions");
 const embeddingsSphericalPca = require("./embeddingsSphericalPca");
 const datasetFilterTags = require("./datasetFilterTags");
 const crypto = require("crypto");
+const { registerVideoRoutes } = require("./videoRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -69,6 +70,15 @@ app.use(
   "/legal",
   express.static(path.join(__dirname, "..", "frontend", "public", "legal")),
 );
+
+app.get("/api/health", (req, res) => {
+  res.json({
+    success: true,
+    service: "traffic-atlas-api",
+    uptimeSeconds: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+});
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, "uploads");
@@ -1180,6 +1190,8 @@ app.post(
     }
   },
 );
+
+registerVideoRoutes(app, { requireAuth, dataStorage });
 
 // Multipart Upload (Sample Dataset)
 app.post(
