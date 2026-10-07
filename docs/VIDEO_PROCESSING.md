@@ -67,10 +67,13 @@ An idle timeout is a shutdown delay after work, not an inference delay.
 The direct reference tracker skips annotated-video generation. No automatic
 source-retention policy or parallel one-hour chunking is implemented here.
 
-The minimal S3 worker has retries and paginated job discovery, but the final
-empty-queue/self-stop race still needs a coordinated shutdown handshake before
-claiming production reliability. The queue-based deployment provides a scheduled
-wake-up mechanism. Suggested zones currently use the bounded trajectory preview;
+The minimal S3 worker uses paginated job discovery and a shutdown-intent marker
+followed by a final queue scan. Lambda retries wake-up while that marker says
+stopping, including before EC2 reports the transition. Its role needs read access
+to the lifecycle object. Exhausted retries or worker startup failures still require
+recovery; this handshake has offline tests, not live deployment verification.
+The queue-based deployment provides a scheduled wake-up mechanism.
+Suggested zones currently use the bounded trajectory preview;
 they are editable suggestions, not a full-length traffic-quality guarantee.
 
 ## Verification

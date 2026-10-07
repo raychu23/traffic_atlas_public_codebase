@@ -24,13 +24,16 @@ write is the GPU wake-up signal. The worker records the terminal state before de
 
 Create two roles:
 
-1. Lambda: CloudWatch Logs write plus `ec2:DescribeInstances` and `ec2:StartInstances` for
-   `i-09d7366988c2ec368`.
+1. Lambda: CloudWatch Logs write, `ec2:DescribeInstances` on `*`, and `ec2:StartInstances`
+   limited to `i-09d7366988c2ec368`. Also grant `s3:GetObject` on the single lifecycle object
+   `arn:aws:s3:::traffic-atlas-db/traffic-video-jobs/_workers/i-09d7366988c2ec368/lifecycle.json`.
 2. GPU instance profile: `s3:ListBucket` for the job prefix; S3 get/put/delete for
    `traffic-video-jobs/*`; and `ec2:StopInstances` for itself.
 
 Attach the second role to the GPU. Configure the bucket to invoke `lambda/wake_gpu.handler` for JSON
 events beneath `traffic-video-jobs/`; the handler rejects anything outside `/control/`.
+Set Lambda environment variables `GPU_INSTANCE_ID`, `TRAFFIC_VIDEO_BUCKET`, and
+`TRAFFIC_VIDEO_S3_PREFIX` to the same instance, bucket, and prefix used by the worker.
 
 ## GPU worker install
 
@@ -55,9 +58,20 @@ TRAFFIC_VIDEO_JOBS_MODULE=/opt/traffic-atlas-worker/videoJobs.js
 Enable `traffic-s3-worker.service`. It starts whenever the GPU boots, so Lambda only starts EC2 and
 never needs SSH.
 
-Keep Lambda asynchronous retries enabled: a wake-up received while EC2 is stopping raises an error
-so it can be retried after shutdown. Worker `zones.json` stores the initial zone suggestions;
-`zones.geojson` stores the latest polygons used for counting.
+The worker writes an `active` lifecycle object on startup. Before idle shutdown it writes
+`stopping`, then scans for jobs once more. A job found in that scan cancels shutdown and restores
+`active`. An upload after the final scan sees the `stopping` intent in Lambda, so its invocation
+fails for retry even if EC2 still reports `running`. A stopped instance can be started regardless
+of its previous marker, and worker startup clears stale shutdown intent. Marker write/read errors
+fail closed: the worker does not stop if its intent or cancellation write fails, and Lambda does
+not acknowledge a running worker with a missing or unreadable marker. The object is retained with
+`active` state rather than deleted, so Lambda needs only exact-object read permission.
+
+Keep Lambda asynchronous retries enabled. This handshake covers the normal upload/shutdown race;
+it does not guarantee delivery after retries or the event age limit are exhausted. If the worker
+cannot boot, IAM denies access, or a stale marker persists after a crash, inspect the retained
+control manifest and retry its wake-up after recovery. Worker `zones.json` stores initial zone
+suggestions; `zones.geojson` stores the latest polygons used for counting.
 
 ## Boundary
 

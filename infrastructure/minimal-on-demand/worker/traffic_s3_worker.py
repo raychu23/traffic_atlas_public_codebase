@@ -164,15 +164,37 @@ def instance_id() -> str:
         return response.read().decode()
 
 
+def set_lifecycle(worker_id: str, state: str) -> None:
+    put_json(f"{PREFIX}/_workers/{worker_id}/lifecycle.json", {
+        "instanceId": worker_id, "state": state, "updatedAt": now_iso(),
+    })
+
+
+def stop_if_idle(worker_id: str) -> bool:
+    # Publish intent before the final queue scan. Uploads before this write are
+    # found by the scan; uploads after it make Lambda retry the wake-up.
+    set_lifecycle(worker_id, "stopping")
+    if next_manifest() is not None:
+        set_lifecycle(worker_id, "active")
+        return False
+    ec2.stop_instances(InstanceIds=[worker_id])
+    return True
+
+
 def main() -> None:
     WORK_ROOT.mkdir(parents=True, exist_ok=True)
+    worker_id = instance_id()
+    # Clear stale shutdown intent before consuming jobs on every worker start.
+    set_lifecycle(worker_id, "active")
     idle_since = time.monotonic()
     while True:
         item = next_manifest()
         if item is None:
             if time.monotonic() - idle_since >= IDLE_TIMEOUT_SECONDS:
-                ec2.stop_instances(InstanceIds=[instance_id()])
-                return
+                if stop_if_idle(worker_id):
+                    return
+                idle_since = time.monotonic()
+                continue
             time.sleep(POLL_SECONDS)
             continue
         idle_since = time.monotonic()
