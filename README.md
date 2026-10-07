@@ -35,6 +35,12 @@ npm run dev
 
 ## 🛠️ Technology Stack
 
+### Video upload
+
+The upload page also accepts traffic video for trajectory tracking, editable zones,
+and movement-count CSVs. See [Video processing](docs/VIDEO_PROCESSING.md) for setup,
+worker requirements, supported processing modes, and verification limits.
+
 - **Frontend**: React 18, React Router, Axios, Tailwind CSS
 - **Backend**: Node.js, Express.js, JWT, Multer
 - **Infrastructure**: AWS S3, Cognito, SES, IAM
