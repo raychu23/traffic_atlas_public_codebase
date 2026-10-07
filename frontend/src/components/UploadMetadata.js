@@ -653,10 +653,8 @@ function UploadMetadata() {
                   </div>
 
                   <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                    <div className="plain-text" id="contains-sensitive-data-label">
-                      Contains Sensitive Data?*
-                    </div>
-                    <div className="sensitive-choice-row" aria-labelledby="contains-sensitive-data-label">
+                    <label className="plain-text">Contains Sensitive Data?*</label>
+                    <div className="sensitive-choice-row">
                       <label className="sensitive-choice">
                         <input
                           type="radio"
@@ -681,10 +679,8 @@ function UploadMetadata() {
                   {formData.contains_sensitive_data && (
                     <>
                       <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                        <div className="plain-text" id="sensitive-data-type-label">
-                          Sensitive Data Type*
-                        </div>
-                        <div className="sensitive-types-grid" aria-labelledby="sensitive-data-type-label">
+                        <label>Sensitive Data Type*</label>
+                        <div className="sensitive-types-grid">
                         {SENSITIVE_DATA_OPTIONS.map((option) => {
                           const optionId = `sensitive-${option.toLowerCase()}`;
                           return (
