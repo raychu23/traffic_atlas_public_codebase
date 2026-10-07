@@ -1,0 +1,16 @@
+[Unit]
+Description=TrafficAtlas on-demand GPU video worker
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/traffic-atlas/video-worker.env
+ExecStart=/opt/traffic-atlas-worker/venv/bin/python /opt/traffic-atlas-worker/traffic_video_worker.py
+Restart=on-failure
+RestartSec=20
+
+[Install]
+WantedBy=multi-user.target

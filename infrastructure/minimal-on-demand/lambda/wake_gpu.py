@@ -1,0 +1,40 @@
+"""S3 notification handler: starts the one TrafficAtlas GPU when a job manifest arrives."""
+import os
+import json
+import urllib.parse
+import boto3
+
+ec2 = boto3.client("ec2")
+s3 = boto3.client("s3")
+INSTANCE_ID = os.environ["GPU_INSTANCE_ID"]
+BUCKET = os.environ["TRAFFIC_VIDEO_BUCKET"]
+PREFIX = os.getenv("TRAFFIC_VIDEO_S3_PREFIX", "traffic-video-jobs").strip("/")
+LIFECYCLE_KEY = f"{PREFIX}/_workers/{INSTANCE_ID}/lifecycle.json"
+
+
+def handler(event, _context):
+    keys = [
+        urllib.parse.unquote_plus(record["s3"]["object"]["key"])
+        for record in event.get("Records", [])
+        if record.get("s3", {}).get("bucket", {}).get("name") == BUCKET
+    ]
+    manifests = [
+        key for key in keys
+        if key.startswith(f"{PREFIX}/") and "/control/" in key and key.endswith(".json")
+    ]
+    if not manifests:
+        return {"started": False, "reason": "no-control-manifest"}
+    instance = ec2.describe_instances(InstanceIds=[INSTANCE_ID])["Reservations"][0]["Instances"][0]
+    state = instance["State"]["Name"]
+    if state == "stopping":
+        # Let Lambda's asynchronous retry deliver the wake-up after shutdown.
+        raise RuntimeError("GPU is stopping; retry the wake-up after it stops")
+    if state == "stopped":
+        ec2.start_instances(InstanceIds=[INSTANCE_ID])
+        return {"started": True, "state": state, "manifests": manifests}
+    if state == "running":
+        response = s3.get_object(Bucket=BUCKET, Key=LIFECYCLE_KEY)
+        lifecycle = json.loads(response["Body"].read())
+        if lifecycle.get("state") != "active":
+            raise RuntimeError("GPU shutdown intent is set; retry the wake-up after it stops")
+    return {"started": False, "state": state, "manifests": manifests}

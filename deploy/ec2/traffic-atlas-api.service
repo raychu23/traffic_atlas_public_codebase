@@ -1,0 +1,24 @@
+[Unit]
+Description=Traffic Atlas API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=traffic-atlas
+Group=traffic-atlas
+WorkingDirectory=/opt/traffic-atlas/current
+EnvironmentFile=/etc/traffic-atlas/api.env
+ExecStart=/usr/bin/node backend/index.js
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/traffic-atlas
+
+[Install]
+WantedBy=multi-user.target

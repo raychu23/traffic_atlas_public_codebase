@@ -544,4 +544,39 @@ export const sendMessage = async (type, requestId, text, actingAs = "user") => {
   return response.data;
 };
 
+export const validateTrafficVideoUpload = async (videoFile, onUploadProgress) => {
+  const formData = new FormData();
+  formData.append('videoFile', videoFile);
+
+  const response = await api.post('/videos/validate-upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    onUploadProgress,
+  });
+  return response.data;
+};
+
+export const getTrafficVideoJob = async (videoId) => {
+  const response = await api.get(`/videos/${videoId}`);
+  return response.data;
+};
+
+export const restartTrafficVideoProcessing = async (videoId) => {
+  const response = await api.post(`/videos/${videoId}/process`);
+  return response.data;
+};
+
+export const updateTrafficVideoZones = async (videoId, zones) => {
+  const response = await api.put(`/videos/${videoId}/zones`, { zones });
+  return response.data;
+};
+
+export const getTrafficVideoArtifact = async (videoId, artifact) => {
+  const response = await api.get(`/videos/${videoId}/artifacts/${artifact}`, {
+    responseType: 'blob',
+  });
+  return response.data;
+};
+
 export default api;
