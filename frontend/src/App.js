@@ -4,6 +4,8 @@ import './App.css';
 import UserRegistration from './components/UserRegistration';
 import Login from './components/Login';
 import UploadLanding from './components/UploadLanding';
+import UploadVideo from './components/UploadVideo';
+import UploadVideoDetails from './components/UploadVideoDetails';
 import UploadMetadata from './components/UploadMetadata';
 import UploadConsent from './components/UploadConsent';
 import DatasetDiscovery from './components/DatasetDiscovery';
@@ -33,6 +35,8 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/upload" element={<ProtectedRoute><UploadLanding /></ProtectedRoute>} />
+          <Route path="/upload/video" element={<ProtectedRoute><UploadVideo /></ProtectedRoute>} />
+          <Route path="/upload/video/details" element={<ProtectedRoute><UploadVideoDetails /></ProtectedRoute>} />
           <Route path="/upload/metadata" element={<ProtectedRoute><UploadMetadata /></ProtectedRoute>} />
           <Route path="/upload/full/:requestId" element={<ProtectedRoute><UploadFullDataset /></ProtectedRoute>} />
           <Route path="/upload/guidelines" element={<DatasetUploadGuidelines />} />
